@@ -31,7 +31,20 @@ export const generatePDF = (formData, submissionId) => {
       // Calculate costs
       const costPerAdult = parseFloat(formData.costPerAdult) || 0;
       const numberOfAdults = parseInt(formData.numberOfAdults) || 0;
-      const totalPackageValue = costPerAdult * numberOfAdults;
+      const subtotal = costPerAdult * numberOfAdults;
+      
+      // Calculate discount
+      let discountAmount = 0;
+      const discountType = formData.discountType || 'none';
+      const discountValue = parseFloat(formData.discountValue) || 0;
+      
+      if (discountType === 'percentage' && discountValue > 0) {
+        discountAmount = (subtotal * discountValue) / 100;
+      } else if (discountType === 'fixed' && discountValue > 0) {
+        discountAmount = discountValue;
+      }
+      
+      const totalPackageValue = subtotal - discountAmount;
       const advanceAmount = parseFloat(formData.advanceAmount) || 0;
       const balancePayable = totalPackageValue - advanceAmount;
       
@@ -57,39 +70,47 @@ export const generatePDF = (formData, submissionId) => {
       const orangeColor = '#f97316';
       const tableBg = '#fbbf24';
 
+      // ============================================================
+      // SINGLE PAGE LAYOUT WITH ALL INFORMATION
+      // ============================================================
+      
       // Add watermark
       addWatermark(doc);
 
-      // === HEADER SECTION WITH LOGO ===
+      // Logo at top center - clearly above title
       const logoPath = path.join(__dirname, '../assets/logo.png');
       
       try {
-        doc.image(logoPath, 250, 40, { width: 95 });
+        doc.image(logoPath, 250, 30, { width: 95 });
       } catch (error) {
         doc
-          .fontSize(20)
+          .fontSize(16)
           .fillColor(orangeColor)
-          .text('YATRASUTRA', 50, 50, { align: 'center', width: 495 });
+          .text('YATRASUTRA', 50, 30, { align: 'center', width: 495 });
       }
 
-      // Title
+      // Title - Bold and properly spaced below logo
       doc
-        .fontSize(16)
+        .font('Helvetica-Bold')
+        .fontSize(14)
         .fillColor(primaryColor)
-        .text('BOOKING CONFIRMATION RECEIPT', 50, 95, { align: 'center', width: 495 });
+        .text('BOOKING CONFIRMATION RECEIPT', 50, 85, { align: 'center', width: 495 });
+      
+      // Reset to regular font for subsequent text
+      doc.font('Helvetica');
 
-      // Company header - moved to just after title
+      // Company header
       doc
-        .fontSize(8)
+        .fontSize(6.5)
         .fillColor('#1e3a8a')
-        .text('Registered Address: 2nd Floor, ABC Towers, MG Road, Kochi # 682016', 50, 118, { align: 'center', width: 495 })
-        .text('Email: info@yatrasutra.com | Phone: +91 98765 43210 | Website: yatrasutra.com', 50, 128, { align: 'center', width: 495 });
+        .text('Registered Address: 1st Floor, Penta Corner Building, Changampuzha Metro Station, Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 50, 103, { align: 'center', width: 495 })
+        .text('Email: info@yatrasutra.com | Phone: +91 97468 16609 / +91 97468 26609 | Website: yatrasutra.com', 50, 111, { align: 'center', width: 495 });
 
-      let yPosition = 148;
+      let yPosition = 125;
 
       // === INVOICE DETAILS TABLE ===
       drawSectionHeader(doc, yPosition, 'INVOICE DETAILS');
-      yPosition += 18;
+      yPosition += 12;
 
       drawCompactTable(doc, yPosition, [
         ['Invoice No.', `YS/INV/2025/071`],
@@ -99,11 +120,11 @@ export const generatePDF = (formData, submissionId) => {
         ['Mode of Payment', `UPI - yatrasutra@upi`]
       ]);
 
-      yPosition = doc.y + 8;
+      yPosition = doc.y + 4;
 
       // === CLIENT DETAILS TABLE ===
       drawSectionHeader(doc, yPosition, 'CLIENT DETAILS');
-      yPosition += 18;
+      yPosition += 12;
 
       drawCompactTable(doc, yPosition, [
         ['Client Name', formData.clientName || 'N/A'],
@@ -112,11 +133,11 @@ export const generatePDF = (formData, submissionId) => {
         ['Booking Reference', bookingRef]
       ]);
 
-      yPosition = doc.y + 8;
+      yPosition = doc.y + 4;
 
       // === BOOKING SUMMARY TABLE ===
       drawSectionHeader(doc, yPosition, 'BOOKING SUMMARY');
-      yPosition += 18;
+      yPosition += 12;
 
       const packageTypeMap = {
         'deluxe': 'Deluxe',
@@ -125,7 +146,8 @@ export const generatePDF = (formData, submissionId) => {
         'luxury': 'Luxury'
       };
 
-      drawWideTable(doc, yPosition, [
+      // Add property name row if available
+      const bookingSummaryRows = [
         ['Destination', 'Duration', 'Travel Dates', 'Guests', 'Package Type', 'Meal Plan'],
         [
           formData.destination || 'N/A',
@@ -135,78 +157,143 @@ export const generatePDF = (formData, submissionId) => {
           packageTypeMap[formData.packageType] || formData.packageType,
           formData.mealPlan || 'N/A'
         ]
-      ]);
+      ];
 
-      yPosition = doc.y + 8;
+      // Add property name as a separate row if it exists
+      if (formData.propertyName) {
+        bookingSummaryRows.push([
+          'Property/Hotel',
+          formData.propertyName,
+          '',
+          '',
+          '',
+          ''
+        ]);
+      }
+
+      drawWideTable(doc, yPosition, bookingSummaryRows);
+
+      yPosition = doc.y + 4;
 
       // === COST BREAKDOWN TABLE ===
       drawSectionHeader(doc, yPosition, 'COST BREAKDOWN');
-      yPosition += 18;
+      yPosition += 12;
 
-      drawCostTable(doc, yPosition, [
+      // Build cost breakdown rows dynamically
+      const costRows = [
         ['Particulars', 'Qty', 'Rate (INR)', 'Amount (INR)'],
-        ['Tour Package Cost per Adult', numberOfAdults.toString(), costPerAdult.toLocaleString('en-IN'), totalPackageValue.toLocaleString('en-IN')],
-        ['Additional Services (if any)', '', '', formData.additionalServices ? 'Included' : '-'],
+        ['Tour Package Cost per Adult', numberOfAdults.toString(), costPerAdult.toLocaleString('en-IN'), subtotal.toLocaleString('en-IN')],
+        ['Additional Services (if any)', '', '', formData.additionalServices ? 'Included' : '-']
+      ];
+      
+      // Add discount row if applicable
+      if (discountAmount > 0) {
+        let discountLabel = 'Discount';
+        if (formData.discountReason) {
+          discountLabel += ` (${formData.discountReason})`;
+        } else if (discountType === 'percentage') {
+          discountLabel += ` (${discountValue}%)`;
+        }
+        costRows.push([discountLabel, '', '', `- ${discountAmount.toLocaleString('en-IN')}`]);
+      }
+      
+      costRows.push(
         ['Total Package Value', '', '', totalPackageValue.toLocaleString('en-IN')],
         ['Advance Amount Received', '', '', advanceAmount.toLocaleString('en-IN')],
         ['Balance Payable (Due 10 Days Before Check-in)', '', '', balancePayable.toLocaleString('en-IN')]
-      ]);
+      );
+      
+      drawCostTable(doc, yPosition, costRows);
+
+      yPosition = doc.y + 4;
+
+      // === TERMS & NOTES ===
+      drawSectionHeader(doc, yPosition, 'TERMS & NOTES');
+      yPosition += 13;
+
+      // Use custom terms and notes if provided, otherwise use default terms
+      if (formData.termsAndNotes && formData.termsAndNotes.trim()) {
+        // Display custom terms and notes
+        doc
+          .fontSize(7)
+          .fillColor('#000000')
+          .text(formData.termsAndNotes, 55, yPosition, { 
+            width: 490, 
+            align: 'left',
+            lineGap: 1
+          });
+      } else {
+        // Default terms and notes
+        doc
+          .fontSize(7)
+          .fillColor('#000000')
+          .text('• Advance payment confirms the booking.', 55, yPosition)
+          .text(`• Balance payment of Rs.${balancePayable.toLocaleString('en-IN')} is due by ${formatDate(formData.checkInDate)} (10 days before check-in).`, 55, yPosition + 8)
+          .text('• Package once confirmed is non-refundable as per the company cancellation policy.', 55, yPosition + 16)
+          .text('• Any change in travel dates or number of guests is subject to availability and price revision.', 55, yPosition + 24)
+          .text('• All communication and receipts are issued under Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 32);
+      }
 
       yPosition = doc.y + 8;
 
-      // === TERMS & NOTES ===
-      drawSectionHeader(doc, yPosition, 'TERMS & NOTES (EDITABLE SECTION)');
-      yPosition += 18;
-
+      // === AUTHORIZED SIGNATORY (left) ===
       doc
         .fontSize(8)
         .fillColor('#000000')
-        .text('• Advance payment confirms the booking.', 55, yPosition)
-        .text(`• Balance payment of Rs.${balancePayable.toLocaleString('en-IN')} is due by ${formatDate(formData.checkInDate)} (10 days before check-in).`, 55, yPosition + 10)
-        .text('• Package once confirmed is non-refundable as per the company cancellation policy.', 55, yPosition + 20)
-        .text('• Any change in travel dates or number of guests is subject to availability and price revision.', 55, yPosition + 30)
-        .text('• All communication and receipts are issued under Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 40);
-
-      yPosition = doc.y + 15;
-
-      // === AUTHORIZED SIGNATORY ===
-      doc
-        .fontSize(9)
-        .fillColor('#000000')
         .text('Authorized Signatory', 55, yPosition)
-        .text('(Seal & Signature)', 55, yPosition + 11)
-        .text('For Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 22);
+        .text('(Seal & Signature)', 55, yPosition + 9)
+        .text('For Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 18);
 
-      // === FIXED FOOTER SECTION AT BOTTOM (NO ORANGE BAR) ===
+      // === FOOTER WITH ORANGE BAR ===
       const pageHeight = doc.page.height;
-      const sealSize = 100; // Bigger seal size (increased from 90)
-      const footerTotalHeight = sealSize + 20; // seal + company name
-      const footerStartY = pageHeight - footerTotalHeight - 10;
-      
-      // Check if current position is too close to footer - if so, add page
-      if (doc.y > footerStartY) {
-        doc.addPage();
-        addWatermark(doc);
-      }
+      const pageWidth = doc.page.width;
+      const footerBarHeight = 45;
+      const footerY = pageHeight - footerBarHeight - 70;
 
-      // Position seal at the bottom of the current page
-      const sealY = pageHeight - footerTotalHeight;
+      // Add seal on the bottom right, above the footer bar
       const sealPath = path.join(__dirname, '../assets/seal.png');
-      
       try {
-        const sealX = (doc.page.width - sealSize) / 2;
+        const sealSize = 110; // Increased from 85
+        const sealX = pageWidth - sealSize - 65; // Positioned from right edge
+        const sealY = footerY - sealSize - 5; // Above the footer bar
         doc.image(sealPath, sealX, sealY, { width: sealSize });
       } catch (error) {
         console.error('Seal image not found');
       }
 
-      // Bottom company name - positioned below seal
+      // Orange background bar
       doc
-        .fontSize(10)
-        .fillColor('#000000')
-        .text('YATRASUTRA HOLIDAYS PVT LTD', 0, sealY + sealSize + 8, { align: 'center', width: doc.page.width });
+        .rect(50, footerY, 495, footerBarHeight)
+        .fillColor(orangeColor)
+        .fill();
 
-      // Finalize PDF - this ends the document
+      // Footer content on orange bar - left (phone)
+      doc
+        .fontSize(7.5)
+        .fillColor('#ffffff')
+        .text('+91 97468 16609', 60, footerY + 13)
+        .text('+91 97468 26609', 60, footerY + 24);
+
+      // Footer content - center (website)
+      doc
+        .fontSize(8)
+        .fillColor('#ffffff')
+        .text('yatrasutra.com', 50, footerY + 18, { align: 'center', width: 495 });
+
+      // Footer content - right (email)
+      doc
+        .fontSize(7.5)
+        .fillColor('#ffffff')
+        .text('info@yatrasutra.com |', 370, footerY + 13)
+        .text('bookings@yatrasutra.com', 360, footerY + 24);
+
+      // Company name below orange bar
+      doc
+        .fontSize(9)
+        .fillColor('#000000')
+        .text('YATRASUTRA HOLIDAYS PVT LTD', 0, footerY + footerBarHeight + 8, { align: 'center', width: pageWidth });
+
+      // Finalize PDF
       doc.end();
 
     } catch (error) {
@@ -233,21 +320,21 @@ function addWatermark(doc) {
  */
 function drawSectionHeader(doc, y, text) {
   doc
-    .rect(50, y, 495, 15)
+    .rect(50, y, 495, 12)
     .fillColor('#fbbf24')
     .fill();
   
   doc
-    .fontSize(9)
+    .fontSize(8)
     .fillColor('#000000')
-    .text(text, 55, y + 3);
+    .text(text, 55, y + 2);
 }
 
 /**
  * Draw a compact table
  */
 function drawCompactTable(doc, y, rows) {
-  const cellHeight = 15;
+  const cellHeight = 12;
   const col1Width = 200;
   const col2Width = 295;
   let currentY = y;
@@ -257,10 +344,10 @@ function drawCompactTable(doc, y, rows) {
     doc.rect(50 + col1Width, currentY, col2Width, cellHeight).stroke();
 
     doc
-      .fontSize(8)
+      .fontSize(7)
       .fillColor('#000000')
-      .text(row[0], 53, currentY + 4, { width: col1Width - 6 })
-      .text(row[1], 53 + col1Width, currentY + 4, { width: col2Width - 6 });
+      .text(row[0], 53, currentY + 3, { width: col1Width - 6 })
+      .text(row[1], 53 + col1Width, currentY + 3, { width: col2Width - 6 });
 
     currentY += cellHeight;
   });
@@ -272,7 +359,7 @@ function drawCompactTable(doc, y, rows) {
  * Draw a wide table with multiple columns
  */
 function drawWideTable(doc, y, rows) {
-  const cellHeight = 15;
+  const cellHeight = 12;
   const colWidths = [80, 70, 100, 60, 90, 95];
   let currentY = y;
 
@@ -282,9 +369,9 @@ function drawWideTable(doc, y, rows) {
     row.forEach((cell, colIndex) => {
       doc.rect(currentX, currentY, colWidths[colIndex], cellHeight).stroke();
       doc
-        .fontSize(7)
+        .fontSize(6.5)
         .fillColor('#000000')
-        .text(cell, currentX + 2, currentY + 4, { width: colWidths[colIndex] - 4 });
+        .text(cell, currentX + 2, currentY + 3, { width: colWidths[colIndex] - 4 });
 
       currentX += colWidths[colIndex];
     });
@@ -299,7 +386,7 @@ function drawWideTable(doc, y, rows) {
  * Draw cost breakdown table
  */
 function drawCostTable(doc, y, rows) {
-  const cellHeight = 15;
+  const cellHeight = 12;
   const colWidths = [250, 60, 90, 95];
   let currentY = y;
 
@@ -309,12 +396,12 @@ function drawCostTable(doc, y, rows) {
     row.forEach((cell, colIndex) => {
       doc.rect(currentX, currentY, colWidths[colIndex], cellHeight).stroke();
 
-      const fontSize = index === 0 ? 8 : 7;
+      const fontSize = index === 0 ? 7 : 6.5;
 
       doc
         .fontSize(fontSize)
         .fillColor('#000000')
-        .text(cell, currentX + 2, currentY + 4, { width: colWidths[colIndex] - 4 });
+        .text(cell, currentX + 2, currentY + 3, { width: colWidths[colIndex] - 4 });
 
       currentX += colWidths[colIndex];
     });
