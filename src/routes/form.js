@@ -40,6 +40,13 @@ const formSchema = {
       placeholder: 'Lakshadweep'
     },
     {
+      name: 'propertyName',
+      label: 'Property/Accommodation/Hotel Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Bangaram Island Resort'
+    },
+    {
       name: 'duration',
       label: 'Duration (Nights)',
       type: 'number',
@@ -111,6 +118,32 @@ const formSchema = {
       placeholder: 'Airport transfers, sightseeing, etc.'
     },
     {
+      name: 'discountType',
+      label: 'Discount Type',
+      type: 'select',
+      required: false,
+      options: [
+        { value: 'none', label: 'No Discount' },
+        { value: 'percentage', label: 'Percentage (%)' },
+        { value: 'fixed', label: 'Fixed Amount (INR)' }
+      ]
+    },
+    {
+      name: 'discountValue',
+      label: 'Discount Value',
+      type: 'number',
+      required: false,
+      placeholder: '5000',
+      min: 0
+    },
+    {
+      name: 'discountReason',
+      label: 'Discount Reason/Description (Optional)',
+      type: 'text',
+      required: false,
+      placeholder: 'Early bird discount, Group booking discount, etc.'
+    },
+    {
       name: 'advanceAmount',
       label: 'Advance Amount (INR)',
       type: 'number',
@@ -130,6 +163,14 @@ const formSchema = {
         { value: 'Debit Card', label: 'Debit Card' },
         { value: 'Cash', label: 'Cash' }
       ]
+    },
+    {
+      name: 'termsAndNotes',
+      label: 'Terms and Notes',
+      type: 'textarea',
+      required: false,
+      placeholder: 'Enter custom terms and conditions, payment instructions, cancellation policy, etc.',
+      rows: 8
     },
     {
       name: 'terms',
