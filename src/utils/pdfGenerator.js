@@ -77,36 +77,46 @@ export const generatePDF = (formData, submissionId) => {
       // Add watermark
       addWatermark(doc);
 
-      // Logo at top center - clearly above title
-      const logoPath = path.join(__dirname, '../assets/logo.png');
-      
+      // Dark blue header bar with increased height
+      const headerHeight = 140;
+      doc
+        .rect(0, 0, doc.page.width, headerHeight)
+        .fillColor(primaryColor)
+        .fill();
+
+      // Register American Captain font
+      const americanCaptainPath = path.join(__dirname, '../assets/AmericanCaptain.otf');
       try {
-        doc.image(logoPath, 250, 30, { width: 95 });
+        doc.registerFont('AmericanCaptain', americanCaptainPath);
+        doc.font('AmericanCaptain');
       } catch (error) {
-        doc
-          .fontSize(16)
-          .fillColor(orangeColor)
-          .text('YATRASUTRA', 50, 30, { align: 'center', width: 495 });
+        doc.font('Helvetica-Bold');
       }
 
-      // Title - Bold and properly spaced below logo
+      // Company name in white with American Captain font (all caps)
       doc
-        .font('Helvetica-Bold')
-        .fontSize(14)
-        .fillColor(primaryColor)
-        .text('BOOKING CONFIRMATION RECEIPT', 50, 85, { align: 'center', width: 495 });
+        .fontSize(32)
+        .fillColor('#ffffff')
+        .text('YATRASUTRA HOLIDAYS PVT. LTD.', 0, 30, { align: 'center', width: doc.page.width });
       
-      // Reset to regular font for subsequent text
-      doc.font('Helvetica');
+      // Booking confirmation receipt text below company name
+      doc
+        .font('Helvetica')
+        .fontSize(12)
+        .fillColor('#ffffff')
+        .text('BOOKING CONFIRMATION RECEIPT', 0, 70, { align: 'center', width: doc.page.width });
 
-      // Company header
+      // Company details inside the blue header (white text)
       doc
         .fontSize(6.5)
-        .fillColor('#1e3a8a')
-        .text('Registered Address: 1st Floor, Penta Corner Building, Changampuzha Metro Station, Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 50, 103, { align: 'center', width: 495 })
-        .text('Email: info@yatrasutra.com | Phone: +91 97468 16609 / +91 97468 26609 | Website: yatrasutra.com', 50, 111, { align: 'center', width: 495 });
+        .fillColor('#ffffff')
+        .text('Registered Address: 1st Floor, Penta Corner Building, Changampuzha Metro Station, Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 50, 90, { align: 'center', width: 495 })
+        .text('Email: info@yatrasutra.com | Phone: +91 97468 16609 / +91 97468 26609 | Website: www.yatrasutra.com', 50, 100, { align: 'center', width: 495 });
+      
+      // Reset to regular font
+      doc.font('Helvetica');
 
-      let yPosition = 125;
+      let yPosition = 155;
 
       // === INVOICE DETAILS TABLE ===
       drawSectionHeader(doc, yPosition, 'INVOICE DETAILS');
@@ -241,8 +251,8 @@ export const generatePDF = (formData, submissionId) => {
         .fontSize(8)
         .fillColor('#000000')
         .text('Authorized Signatory', 55, yPosition)
-        .text('(Seal & Signature)', 55, yPosition + 9)
-        .text('For Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 18);
+        .text('(Seal & Signature)', 55, yPosition + 13)
+        .text('For Yatrasutra Holidays Pvt. Ltd.', 55, yPosition + 26);
 
       // === FOOTER WITH ORANGE BAR ===
       const pageHeight = doc.page.height;
@@ -253,7 +263,7 @@ export const generatePDF = (formData, submissionId) => {
       // Add seal on the bottom right, above the footer bar
       const sealPath = path.join(__dirname, '../assets/seal.png');
       try {
-        const sealSize = 110; // Increased from 85
+        const sealSize = 150; // Increased from 85
         const sealX = pageWidth - sealSize - 65; // Positioned from right edge
         const sealY = footerY - sealSize - 5; // Above the footer bar
         doc.image(sealPath, sealX, sealY, { width: sealSize });

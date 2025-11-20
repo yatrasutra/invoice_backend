@@ -355,8 +355,7 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
       fileId = fileIdMatch[1];
     }
 
-    console.log('Attempting to download file ID:', fileId);
-    console.log('From bucket:', config.bucketId);
+
 
     // Get file from Appwrite Storage
     const fileBuffer = await storage.getFileDownload(config.bucketId, fileId);
