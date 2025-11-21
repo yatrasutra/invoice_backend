@@ -84,6 +84,17 @@ export const generatePDF = (formData, submissionId) => {
         .fillColor(primaryColor)
         .fill();
 
+      // Add logo on the left side of the header
+      const logoPath = path.join(__dirname, '../assets/logo.png');
+      try {
+        const logoSize = 50;
+        const logoX = 70; // Left side positioning
+        const logoY = 25; // Aligned with company name
+        doc.image(logoPath, logoX, logoY, { width: logoSize });
+      } catch (error) {
+        console.log('Logo image not found');
+      }
+
       // Register American Captain font
       const americanCaptainPath = path.join(__dirname, '../assets/AmericanCaptain.otf');
       try {
@@ -93,25 +104,25 @@ export const generatePDF = (formData, submissionId) => {
         doc.font('Helvetica-Bold');
       }
 
-      // Company name in white with American Captain font (all caps)
+      // Company name in white with American Captain font (all caps) - positioned to the right of logo
       doc
-        .fontSize(32)
+        .fontSize(20)
         .fillColor('#ffffff')
-        .text('YATRASUTRA HOLIDAYS PVT. LTD.', 0, 30, { align: 'center', width: doc.page.width });
+        .text('YATRASUTRA HOLIDAYS PVT. LTD.', 135, 40, { align: 'left' });
       
       // Booking confirmation receipt text below company name
       doc
         .font('Helvetica')
-        .fontSize(12)
+        .fontSize(11)
         .fillColor('#ffffff')
-        .text('BOOKING CONFIRMATION RECEIPT', 0, 70, { align: 'center', width: doc.page.width });
+        .text('BOOKING CONFIRMATION RECEIPT', 0, 65, { align: 'center', width: doc.page.width });
 
       // Company details inside the blue header (white text)
       doc
         .fontSize(6.5)
         .fillColor('#ffffff')
-        .text('Registered Address: 1st Floor, Penta Corner Building, Changampuzha Metro Station, Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 50, 90, { align: 'center', width: 495 })
-        .text('Email: info@yatrasutra.com | Phone: +91 97468 16609 / +91 97468 26609 | Website: www.yatrasutra.com', 50, 100, { align: 'center', width: 495 });
+        .text('Registered Address: 1st Floor, Penta Corner Building, Changampuzha Metro Station, Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 0, 90, { align: 'center', width: doc.page.width })
+        .text('Email: info@yatrasutra.com | Phone: +91 97468 16609 / +91 97468 26609 | Website: www.yatrasutra.com', 0, 100, { align: 'center', width: doc.page.width });
       
       // Reset to regular font
       doc.font('Helvetica');
