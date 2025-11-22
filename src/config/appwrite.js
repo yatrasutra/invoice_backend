@@ -20,6 +20,7 @@ export const users = new Users(client);
 export const config = {
   databaseId: process.env.APPWRITE_DATABASE_ID,
   submissionsCollectionId: process.env.APPWRITE_SUBMISSIONS_COLLECTION_ID,
+  itinerariesCollectionId: process.env.APPWRITE_ITINERARIES_COLLECTION_ID,
   usersCollectionId: process.env.APPWRITE_USERS_COLLECTION_ID,
   bucketId: process.env.APPWRITE_BUCKET_ID,
 };
