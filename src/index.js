@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import formRoutes from './routes/form.js';
 import adminRoutes from './routes/admin.js';
+import itineraryRoutes from './routes/itinerary.js';
+import adminItineraryRoutes from './routes/adminItinerary.js';
+import testPdfRoutes from './routes/testPdf.js';
 
 dotenv.config();
 
@@ -19,6 +22,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/form', formRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/itinerary', itineraryRoutes);
+app.use('/api/admin', adminItineraryRoutes);
+
+// Development/Testing routes (consider removing in production)
+app.use('/api/test', testPdfRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
