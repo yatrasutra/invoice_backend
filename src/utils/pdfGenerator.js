@@ -62,8 +62,24 @@ export const generatePDF = (formData, submissionId) => {
       const invoiceDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
       const travelDates = `${formatDate(formData.checkInDate)} - ${formatDate(formData.checkOutDate)}`;
 
-      // Generate booking reference
-      const bookingRef = `LKD/2026/15MAY`;
+      // Generate unique invoice number
+      const currentYear = new Date().getFullYear();
+      const invoiceNumber = submissionId 
+        ? `YS/INV/${currentYear}/${submissionId}` 
+        : `YS/INV/${currentYear}/${Date.now().toString().slice(-6)}`;
+
+      // Generate booking reference based on destination and check-in date
+      // Format: [First 3 letters of destination]/[Year]/[Date abbreviation]
+      // Example: chennai → CHE/2025/19NOV
+      let bookingRef = 'N/A';
+      if (formData.destination && formData.checkInDate) {
+        const destCode = formData.destination.substring(0, 3).toUpperCase();
+        const checkInDate = new Date(formData.checkInDate);
+        const day = checkInDate.getDate().toString().padStart(2, '0');
+        const month = checkInDate.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+        const year = checkInDate.getFullYear();
+        bookingRef = `${destCode}/${year}/${day}${month}`;
+      }
 
       // Colors
       const primaryColor = '#1e3a8a';
@@ -133,12 +149,18 @@ export const generatePDF = (formData, submissionId) => {
       drawSectionHeader(doc, yPosition, 'INVOICE DETAILS');
       yPosition += 12;
 
+      // Format payment mode display
+      let paymentModeDisplay = formData.paymentMode || 'UPI';
+      if (paymentModeDisplay === 'UPI') {
+        paymentModeDisplay = 'UPI - yatrasutra@upi';
+      }
+
       drawCompactTable(doc, yPosition, [
-        ['Invoice No.', `YS/INV/2025/071`],
+        ['Invoice No.', invoiceNumber],
         ['Invoice Date', invoiceDate],
         ['Payment Status', 'Advance Paid'],
         ['Payment Date', invoiceDate],
-        ['Mode of Payment', `UPI - yatrasutra@upi`]
+        ['Mode of Payment', paymentModeDisplay]
       ]);
 
       yPosition = doc.y + 4;
@@ -274,7 +296,7 @@ export const generatePDF = (formData, submissionId) => {
       // Add seal on the bottom right, above the footer bar
       const sealPath = path.join(__dirname, '../assets/seal.png');
       try {
-        const sealSize = 150; // Increased from 85
+        const sealSize = 200; // Increased from 85
         const sealX = pageWidth - sealSize - 65; // Positioned from right edge
         const sealY = footerY - sealSize - 5; // Above the footer bar
         doc.image(sealPath, sealX, sealY, { width: sealSize });
