@@ -1,7 +1,8 @@
 import express from 'express';
 import { databases, storage, config } from '../config/appwrite.js';
-import { Query, ID } from 'node-appwrite';
+import { Query, ID, Permission, Role } from 'node-appwrite';
 import { authenticateToken } from '../middleware/auth.js';
+import { Blob } from 'buffer';
 import {
   inclusionsList,
   exclusionsList,
@@ -16,29 +17,54 @@ const router = express.Router();
 // Dynamic form schema - Itinerary/Brochure Form
 const itineraryFormSchema = {
   fields: [
-    // Basic Trip Details Section
+    // Cover Page Details
+    {
+      name: 'guestName',
+      label: 'Guest Name',
+      type: 'text',
+      required: true,
+      placeholder: 'John Doe'
+    },
     {
       name: 'destination',
       label: 'Destination',
       type: 'text',
       required: true,
-      placeholder: 'KUALA LUMPUR'
+      placeholder: 'Port Blair'
     },
     {
-      name: 'travelDate',
-      label: 'Travel Date (Month Year)',
-      type: 'text',
-      required: true,
-      placeholder: 'Nov 2025'
+      name: 'startDate',
+      label: 'Start Date',
+      type: 'date',
+      required: true
     },
     {
       name: 'duration',
-      label: 'Duration (Nights)',
+      label: 'Duration (Nights / Days)',
+      type: 'text',
+      required: true,
+      placeholder: '3 Nights / 4 Days'
+    },
+    {
+      name: 'tripId',
+      label: 'Trip ID',
+      type: 'text',
+      required: true,
+      placeholder: 'YS-2025-001'
+    },
+    {
+      name: 'quotePrice',
+      label: 'Quote Price (Total in INR)',
       type: 'number',
       required: true,
-      placeholder: '3',
-      min: 1,
-      max: 30
+      placeholder: '85000'
+    },
+    {
+      name: 'paymentNote',
+      label: 'Payment Note',
+      type: 'text',
+      required: false,
+      placeholder: 'Book Now – Pay 50% to Confirm'
     },
     
     // Passenger Details
@@ -105,18 +131,35 @@ const itineraryFormSchema = {
           type: 'number',
           required: true
         },
+        date: {
+          label: 'Full Date',
+          type: 'date',
+          required: true
+        },
         title: {
           label: 'Day Title',
           type: 'text',
           required: true,
-          placeholder: 'ARRIVAL KUALA LUMPUR - KUALA LUMPUR CITY TOUR + KL TOWER'
+          placeholder: 'Port Blair Arrival – Corbyn\'s Cove & Cellular Jail'
         },
         description: {
-          label: 'Day Description',
+          label: 'Day Description (Bullet Points)',
           type: 'textarea',
           required: true,
-          placeholder: 'Arrive at Kula Lampur International airport. After emigration formalities...',
+          placeholder: '• Airport pickup\n• Hotel transfer\n• Sightseeing descriptions',
           rows: 6
+        },
+        ticketInclusion: {
+          label: 'Ticket/Inclusion (Optional)',
+          type: 'text',
+          required: false,
+          placeholder: 'Port Blair – Cellular Jail Entry Ticket'
+        },
+        imageUrl: {
+          label: 'Day Image URL (from Appwrite)',
+          type: 'text',
+          required: false,
+          placeholder: 'Upload image first, then paste URL here'
         }
       }
     },
@@ -124,33 +167,115 @@ const itineraryFormSchema = {
     // Hotel Options (Dynamic Array)
     {
       name: 'hotels',
-      label: 'Accommodation Options',
+      label: 'Accommodation Options (One per night)',
       type: 'array',
       required: true,
       itemSchema: {
+        nightNumber: {
+          label: 'Night Number',
+          type: 'number',
+          required: true,
+          placeholder: '1'
+        },
+        location: {
+          label: 'Location',
+          type: 'text',
+          required: true,
+          placeholder: 'Port Blair'
+        },
+        checkInDate: {
+          label: 'Check-in Date',
+          type: 'date',
+          required: true
+        },
         name: {
           label: 'Hotel Name',
           type: 'text',
           required: true,
-          placeholder: 'IBIS Frazer park'
+          placeholder: 'Sea Shell Resort'
         },
-        category: {
-          label: 'Hotel Category',
+        starRating: {
+          label: 'Star Rating',
           type: 'select',
           required: true,
-          options: hotelCategories
+          options: [
+            { value: '3*', label: '3 Star' },
+            { value: '4*', label: '4 Star' },
+            { value: '5*', label: '5 Star' },
+            { value: 'Resort', label: 'Resort' },
+            { value: 'Budget', label: 'Budget' }
+          ]
         },
-        packageCostPerPerson: {
-          label: 'Package Cost Per Person (INR)',
+        roomType: {
+          label: 'Room Type',
+          type: 'text',
+          required: true,
+          placeholder: 'Deluxe Sea View'
+        },
+        numberOfRooms: {
+          label: 'Number of Rooms',
           type: 'number',
           required: true,
-          placeholder: '21400'
+          placeholder: '2',
+          min: 1
         },
-        packageCostPerChild: {
-          label: 'Package Cost Per Child (INR)',
-          type: 'number',
+        paxDistribution: {
+          label: 'Pax Distribution',
+          type: 'text',
           required: true,
-          placeholder: '17000'
+          placeholder: '2 Adults + 1 Child per room'
+        },
+        mealPlan: {
+          label: 'Meal Plan',
+          type: 'select',
+          required: true,
+          options: mealPlans
+        },
+        imageUrl: {
+          label: 'Hotel Image URL (from Appwrite)',
+          type: 'text',
+          required: false,
+          placeholder: 'Upload image first, then paste URL here'
+        }
+      }
+    },
+
+    // Transportation & Activities
+    {
+      name: 'transportation',
+      label: 'Transportation & Activities',
+      type: 'array',
+      required: false,
+      itemSchema: {
+        day: {
+          label: 'Day',
+          type: 'text',
+          required: true,
+          placeholder: '1st Day, Wed 11 Feb'
+        },
+        serviceDescription: {
+          label: 'Service Description',
+          type: 'text',
+          required: true,
+          placeholder: 'Airport pickup, ferry transfer, sightseeing'
+        },
+        vehicleType: {
+          label: 'Vehicle Type',
+          type: 'text',
+          required: false,
+          placeholder: 'Xylo / Ertiga / Innova'
+        },
+        ticketsIncluded: {
+          label: 'Tickets Included',
+          type: 'text',
+          required: false,
+          placeholder: 'Cellular Jail Entry Ticket – 4 Adults + 1 Child'
+        },
+        ferryDetails: {
+          label: 'Ferry Details (if applicable)',
+          type: 'text',
+          required: false,
+          placeholder: 'Operator, duration, category'
         }
       }
     },
@@ -195,6 +320,73 @@ const itineraryFormSchema = {
       rows: 3
     },
 
+    // Cover Page Hero Image
+    {
+      name: 'coverHeroImageUrl',
+      label: 'Cover Page Hero Image URL (from Appwrite)',
+      type: 'text',
+      required: false,
+      placeholder: 'Upload image first, then paste URL here'
+    },
+
+    // Optional Activity Rate Card
+    {
+      name: 'activityRateCard',
+      label: 'Activity Rate Card (Optional)',
+      type: 'array',
+      required: false,
+      itemSchema: {
+        activityName: {
+          label: 'Activity Name',
+          type: 'text',
+          required: true,
+          placeholder: 'Scuba Diving'
+        },
+        pricePerPerson: {
+          label: 'Price Per Person (INR)',
+          type: 'number',
+          required: true,
+          placeholder: '3500'
+        },
+        note: {
+          label: 'Note',
+          type: 'text',
+          required: false,
+          placeholder: 'Weather subject, government rules, etc.'
+        }
+      }
+    },
+
+    // Consultant Information
+    {
+      name: 'consultantName',
+      label: 'Travel Consultant Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Rajesh Kumar'
+    },
+    {
+      name: 'consultantPosition',
+      label: 'Consultant Position',
+      type: 'text',
+      required: true,
+      placeholder: 'Travel Consultant / Senior Executive / Team Leader'
+    },
+    {
+      name: 'consultantMobile',
+      label: 'Consultant Mobile Number',
+      type: 'text',
+      required: true,
+      placeholder: '+91 98765 43210'
+    },
+    {
+      name: 'consultantEmail',
+      label: 'Consultant Email',
+      type: 'email',
+      required: true,
+      placeholder: 'rajesh@yatrasutra.com'
+    },
+
     // Terms Acceptance
     {
       name: 'acceptTerms',
@@ -231,7 +423,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
     }
 
     // Validate required fields
-    const requiredFields = ['destination', 'travelDate', 'duration', 'adults', 'hotelCategory', 'mealPlan', 'transferPlan', 'days', 'hotels', 'inclusions', 'exclusions', 'acceptTerms'];
+    const requiredFields = ['guestName', 'destination', 'startDate', 'duration', 'tripId', 'quotePrice', 'adults', 'days', 'hotels', 'inclusions', 'exclusions', 'consultantName', 'consultantPosition', 'consultantMobile', 'consultantEmail', 'acceptTerms'];
 
     for (const field of requiredFields) {
       if (!data[field] && data[field] !== false && data[field] !== 0) {
@@ -405,6 +597,123 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error downloading brochure PDF:', error);
     return res.status(500).json({ error: 'Failed to download brochure' });
+  }
+});
+
+/**
+ * POST /api/itinerary/upload-image
+ * Upload an image to Appwrite Storage for itinerary (cover, day, or hotel images)
+ * Accepts: multipart/form-data with 'image' field and optional 'type' field (cover|day|hotel)
+ */
+router.post('/upload-image', authenticateToken, async (req, res) => {
+  // Allowed file extensions (commonly supported by Appwrite buckets)
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+  
+  try {
+    // Check if request has file (multipart/form-data)
+    if (!req.body.image && !req.body.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    // For base64 encoded images
+    let imageBuffer;
+    let fileName;
+    let mimeType = 'image/jpeg';
+    
+    if (req.body.image) {
+      // Handle base64 encoded image
+      const base64Data = req.body.image.replace(/^data:image\/\w+;base64,/, '');
+      imageBuffer = Buffer.from(base64Data, 'base64');
+      
+      // Extract mime type from data URL and normalize extension
+      const mimeMatch = req.body.image.match(/data:image\/(\w+);base64/);
+      if (mimeMatch) {
+        let extension = mimeMatch[1].toLowerCase();
+        // Normalize common extensions
+        if (extension === 'jpeg') extension = 'jpg';
+        if (extension === 'svg+xml') extension = 'svg';
+        
+        // Ensure extension is in allowed list, default to jpg if not
+        if (!allowedExtensions.includes(extension)) {
+          console.warn(`Extension ${extension} not in allowed list, defaulting to jpg`);
+          extension = 'jpg';
+          mimeType = 'image/jpeg';
+        } else {
+          mimeType = `image/${mimeMatch[1]}`;
+        }
+        
+        fileName = `itinerary-image-${Date.now()}.${extension}`;
+      } else {
+        // Default to jpg if no mime type found
+        mimeType = 'image/jpeg';
+        fileName = `itinerary-image-${Date.now()}.jpg`;
+      }
+    } else {
+      return res.status(400).json({ error: 'Please provide image as base64 in "image" field' });
+    }
+
+    // Create a File-like object for Appwrite
+    const blob = new Blob([imageBuffer], { type: mimeType });
+    const file = new File([blob], fileName, { 
+      type: mimeType,
+      lastModified: Date.now()
+    });
+
+    // Upload to Appwrite Storage (uses imagesBucketId which falls back to bucketId if not set)
+    const uploadedFile = await storage.createFile(
+      config.imagesBucketId,
+      ID.unique(),
+      file,
+      [
+        Permission.read(Role.user(req.user.userId)),
+        Permission.read(Role.any()) // Allow public read access
+      ]
+    );
+
+    // Generate file URL
+    const fileUrl = `${process.env.APPWRITE_ENDPOINT}/storage/buckets/${config.imagesBucketId}/files/${uploadedFile.$id}/view?project=${process.env.APPWRITE_PROJECT_ID}`;
+
+    return res.json({
+      message: 'Image uploaded successfully',
+      fileId: uploadedFile.$id,
+      url: fileUrl,
+      // Return in format: fileId|url for consistency
+      imageUrl: `${uploadedFile.$id}|${fileUrl}`
+    });
+
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    
+    // Provide helpful error message for file extension issues
+    if (error.type === 'storage_file_type_unsupported' || (error.code === 400 && error.message?.includes('extension'))) {
+      const attemptedExtension = fileName ? fileName.split('.').pop() : 'unknown';
+      return res.status(400).json({ 
+        error: 'File extension not allowed', 
+        details: `The file extension "${attemptedExtension}" is not allowed in your Appwrite bucket. Please configure your bucket to allow these extensions: ${allowedExtensions.join(', ')}. You can do this in the Appwrite Console under Storage > Buckets > [Your Bucket] > Settings > Allowed file extensions.`,
+        attemptedExtension: attemptedExtension,
+        allowedExtensions: allowedExtensions
+      });
+    }
+    
+    return res.status(500).json({ error: 'Failed to upload image', details: error.message });
+  }
+});
+
+/**
+ * POST /api/itinerary/upload-image-multipart
+ * Alternative endpoint for multipart/form-data uploads
+ * Requires: multer middleware (if you want to add it) or handle via base64
+ */
+router.post('/upload-image-multipart', authenticateToken, express.raw({ type: 'multipart/form-data', limit: '10mb' }), async (req, res) => {
+  try {
+    // This is a placeholder - for proper multipart handling, you'd need multer
+    // For now, recommend using the base64 endpoint above
+    return res.status(501).json({ 
+      error: 'Multipart upload not yet implemented. Please use /upload-image with base64 encoded image.' 
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    return res.status(500).json({ error: 'Failed to upload image' });
   }
 });
 

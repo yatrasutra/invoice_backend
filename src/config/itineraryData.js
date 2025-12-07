@@ -26,22 +26,46 @@ export const exclusionsList = [
 export const bookingPolicy = {
   cancellationPolicy: [
     {
-      notice: 'Before 15 days of the travel date',
-      charge: '75% of the full amount'
+      notice: '0-10 days before travel',
+      charge: '100% cancellation charges'
     },
     {
-      notice: 'Before 10 days of the travel date',
-      charge: '100% of the full amount'
+      notice: '11-20 days before travel',
+      charge: '50% cancellation charges'
+    },
+    {
+      notice: '21-30 days before travel',
+      charge: '25% cancellation charges'
+    },
+    {
+      notice: 'More than 30 days before travel',
+      charge: '10% cancellation charges'
     }
   ],
+  cancellationNotes: [
+    'No refund for unused services',
+    'Flight cancellation conditions apply as per airline policy',
+    'Hotel-specific cancellation conditions may apply',
+    'Peak-season restrictions may apply',
+    'Force majeure clause: No refund for cancellations due to natural disasters, pandemics, or government restrictions'
+  ],
   paymentTerms: [
-    'Passport copy with 50% payment is required as advanced payment for the booking',
-    'Full payment is required 15 days prior to the travel date OR according the time limit of booking'
+    '50% advance payment required to confirm booking',
+    'Remaining balance 7-10 days before travel',
+    'No booking without advance payment',
+    'Prices subject to availability',
+    'Room upgrades subject to additional charges'
   ],
   termsAndConditions: [
-    'Rates are valid for Indian citizens only',
-    'Early Check in/ Late Check Out/ Interconnecting rooms are subject to availability',
-    'Any increase in the cost that may come into force prior to the departure date'
+    'Guest Responsibility: Guests are responsible for carrying valid identity proof, following local laws, and maintaining travel insurance',
+    'Company Responsibility: Yatrasutra Holidays is responsible for providing services as per the itinerary and on-ground support',
+    'Transport Limitations: Vehicle usage is limited to itinerary activities. Extra usage charges apply',
+    'Permit Rules: Guests must obtain necessary permits for restricted areas. Company will assist but not responsible for permit delays',
+    'Luggage Guidelines: Standard luggage allowance applies. Excess luggage charges as per airline/hotel policy',
+    'Safety Guidelines: Guests must follow safety instructions during activities. Company not liable for injuries due to negligence',
+    'Identity Proof Requirements: Valid passport/ID required for all bookings and check-ins',
+    'Additional Charges: Parking fees, extra vehicle usage, room service, and personal expenses are not included',
+    'Operational Flexibility: Itinerary may change due to weather, local conditions, or operational requirements. Alternative arrangements will be made'
   ]
 };
 

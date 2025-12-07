@@ -3,6 +3,7 @@ import { databases, storage, config } from '../config/appwrite.js';
 import { Query, ID, Permission, Role } from 'node-appwrite';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { generateBrochurePDF } from '../utils/brochurePdfGenerator.js';
+import { generateItineraryPDF } from '../utils/itineraryPdfGenerator.js';
 import { Blob } from 'buffer';
 
 const router = express.Router();
@@ -82,8 +83,8 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
 
     const formData = JSON.parse(submission.data);
 
-    // Generate Brochure PDF
-    const pdfBuffer = await generateBrochurePDF(formData, submission.$id);
+    // Generate Itinerary PDF (new specification)
+    const pdfBuffer = await generateItineraryPDF(formData, submission.$id);
 
     // Create a File object from the buffer
     const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
