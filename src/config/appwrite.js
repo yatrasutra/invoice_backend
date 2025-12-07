@@ -23,6 +23,8 @@ export const config = {
   itinerariesCollectionId: process.env.APPWRITE_ITINERARIES_COLLECTION_ID,
   usersCollectionId: process.env.APPWRITE_USERS_COLLECTION_ID,
   bucketId: process.env.APPWRITE_BUCKET_ID,
+  // Use same bucket for images, or create separate bucket
+  imagesBucketId: process.env.APPWRITE_IMAGES_BUCKET_ID || process.env.APPWRITE_BUCKET_ID,
 };
 
 export default client;
