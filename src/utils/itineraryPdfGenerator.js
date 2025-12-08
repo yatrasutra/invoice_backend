@@ -62,6 +62,18 @@ export const generateItineraryPDF = async (formData, submissionId) => {
         console.log('Header image 2 not found:', e.message);
       }
 
+      // Load footer logo
+      const footerLogoPath = path.join(__dirname, '../assets/itenary/footerLogo.png');
+      let footerLogoBuffer = null;
+      
+      try {
+        if (fs.existsSync(footerLogoPath)) {
+          footerLogoBuffer = fs.readFileSync(footerLogoPath);
+        }
+      } catch (e) {
+        console.log('Footer logo not found:', e.message);
+      }
+
       // Helper function to download image from URL
       const downloadImage = (url) => {
         return new Promise((resolve, reject) => {
@@ -151,23 +163,62 @@ export const generateItineraryPDF = async (formData, submissionId) => {
 
       // Add styled footer to every page
       const addStyledFooter = (doc, pageNum) => {
-        const footerHeight = 40;
+        const footerHeight = 55;
         const footerY = doc.page.height - footerHeight;
         
         // Blue footer background - matching header
         doc.rect(0, footerY, doc.page.width, footerHeight).fillColor(blue).fill();
         
-        // Contact info on left
-        doc.fontSize(9).fillColor(white).font('Helvetica')
-           .text('+91 97468 16609', 50, footerY + 14);
+        // Footer logo on left
+        let logoWidth = 0;
+        if (footerLogoBuffer) {
+          try {
+            doc.image(footerLogoBuffer, 15, footerY + 8, { height: 40 });
+            logoWidth = 60;
+          } catch (e) {
+            console.log('Footer logo error:', e.message);
+          }
+        }
         
-        // Website on right  
-        doc.fontSize(9).fillColor(white)
-           .text('www.yatrasutra.com', doc.page.width - 180, footerY + 14);
+        // Contact info - Phone
+        const contactX = 15 + logoWidth + 10;
+        doc.fontSize(8).fillColor(white).font('Helvetica')
+           .text('+91 97468 16609', contactX, footerY + 12);
+        
+        // Email
+        doc.fontSize(8).fillColor(white).font('Helvetica')
+           .text('info@yatrasutra.com', contactX, footerY + 24);
+        
+        // Website
+        doc.fontSize(8).fillColor(white)
+           .text('www.yatrasutra.com', contactX, footerY + 36);
         
         // Page number center
-        doc.fontSize(9).fillColor(white)
-           .text(String(pageNum), 0, footerY + 14, { align: 'center', width: doc.page.width });
+        doc.fontSize(9).fillColor(white).font('Helvetica-Bold')
+           .text(String(pageNum), 0, footerY + 22, { align: 'center', width: doc.page.width });
+        
+        // Social media links on right
+        const socialX = doc.page.width - 140;
+        doc.fontSize(8).fillColor(white).font('Helvetica')
+           .text('Follow us:', socialX, footerY + 12);
+        
+        // Facebook icon (f)
+        doc.fontSize(9).fillColor('#4267B2').font('Helvetica-Bold')
+           .text('f', socialX, footerY + 26);
+        doc.fontSize(8).fillColor(white).font('Helvetica')
+           .text(' Facebook', socialX + 8, footerY + 26, { 
+             link: 'https://m.facebook.com/61574118189623/',
+             underline: true 
+           });
+        
+        // Instagram icon
+        doc.fontSize(9).fillColor('#E1306C').font('Helvetica-Bold')
+           .text('@', socialX, footerY + 38);
+        doc.fontSize(8).fillColor(white).font('Helvetica')
+           .text(' Instagram', socialX + 10, footerY + 38, { 
+             link: 'https://www.instagram.com/yatra.sutra?igsh=ZGZ1NW1pZGxhbzJi',
+             underline: true 
+           });
       };
 
       // Add header image to page
@@ -347,13 +398,13 @@ export const generateItineraryPDF = async (formData, submissionId) => {
           
           yPos += 20;
           
-          // Star rating display
+          // Star rating display - using asterisks for better PDF compatibility
           const stars = parseInt(hotel.starRating) || 3;
           let starText = '';
-          for (let s = 0; s < 5; s++) {
-            starText += s < stars ? '★' : '☆';
+          for (let s = 0; s < stars; s++) {
+            starText += '*';
           }
-          doc.fontSize(13).fillColor('#FFA726').text(starText, 50, yPos);
+          doc.fontSize(13).fillColor('#FFA726').font('Helvetica-Bold').text(`${stars} Star Hotel`, 50, yPos);
 
           yPos += 27;
 
@@ -480,8 +531,9 @@ export const generateItineraryPDF = async (formData, submissionId) => {
       doc.fontSize(10).fillColor(darkText).font('Helvetica');
       (formData.inclusions || []).forEach((item) => {
         const cleanItem = decodeHTMLEntities(item);
-        doc.text(`• ${cleanItem}`, 55, incY, { width: columnWidth - 10, lineGap: 2 });
-        incY += 18;
+        const textHeight = doc.heightOfString(`• ${cleanItem}`, { width: columnWidth - 10, lineGap: 4 });
+        doc.text(`• ${cleanItem}`, 55, incY, { width: columnWidth - 10, lineGap: 4 });
+        incY += Math.max(textHeight + 8, 28);
       });
 
       // Exclusions
@@ -491,8 +543,9 @@ export const generateItineraryPDF = async (formData, submissionId) => {
       doc.fontSize(10).fillColor(darkText).font('Helvetica');
       (formData.exclusions || []).forEach((item) => {
         const cleanItem = decodeHTMLEntities(item);
-        doc.text(`• ${cleanItem}`, 55 + columnWidth + 20, excY, { width: columnWidth - 10, lineGap: 2 });
-        excY += 18;
+        const textHeight = doc.heightOfString(`• ${cleanItem}`, { width: columnWidth - 10, lineGap: 4 });
+        doc.text(`• ${cleanItem}`, 55 + columnWidth + 20, excY, { width: columnWidth - 10, lineGap: 4 });
+        excY += Math.max(textHeight + 8, 28);
       });
 
       addStyledFooter(doc, 4 + days.length);
@@ -512,16 +565,19 @@ export const generateItineraryPDF = async (formData, submissionId) => {
       
       doc.fontSize(10).fillColor(darkText).font('Helvetica');
       bookingPolicy.termsAndConditions.forEach((term) => {
-        if (yPos > 680) {
+        const cleanTerm = decodeHTMLEntities(term);
+        const termHeight = doc.heightOfString(`• ${cleanTerm}`, { width: doc.page.width - 120, lineGap: 5 });
+        
+        // Check if we need a new page
+        if (yPos + termHeight > 680) {
           addStyledFooter(doc, 5 + days.length);
           doc.addPage();
           yPos = addHeader(doc, false);
           yPos += 30;
         }
         
-        const cleanTerm = decodeHTMLEntities(term);
-        doc.text(`• ${cleanTerm}`, 60, yPos, { width: doc.page.width - 120, lineGap: 2, align: 'left' });
-        yPos += 22;
+        doc.text(`• ${cleanTerm}`, 60, yPos, { width: doc.page.width - 120, lineGap: 5, align: 'left' });
+        yPos += termHeight + 12;
       });
 
       addStyledFooter(doc, 5 + days.length);
@@ -538,35 +594,51 @@ export const generateItineraryPDF = async (formData, submissionId) => {
 
       yPos += 55;
 
-      // Consultant card
-      doc.rect(100, yPos, doc.page.width - 200, 180).fillColor(lightPink).fill()
+      // Consultant card - expanded for address
+      doc.rect(80, yPos, doc.page.width - 160, 260).fillColor(lightPink).fill()
          .strokeColor(pink).lineWidth(2).stroke();
 
-      yPos += 35;
+      yPos += 25;
       doc.fontSize(16).fillColor(darkText).font('Helvetica-Bold')
          .text(formData.consultantName || 'Travel Consultant', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 28;
+      yPos += 22;
       doc.fontSize(11).fillColor(grey).font('Helvetica')
          .text(formData.consultantPosition || 'Senior Travel Advisor', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 32;
+      yPos += 25;
       doc.fontSize(10).fillColor(grey).font('Helvetica')
          .text('Mobile:', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 15;
+      yPos += 14;
       doc.fontSize(11).fillColor(darkText).font('Helvetica-Bold')
          .text(formData.consultantMobile || '+91 97468 16609', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 20;
+      yPos += 18;
       doc.fontSize(10).fillColor(grey).font('Helvetica')
          .text('Email:', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 15;
+      yPos += 14;
       doc.fontSize(11).fillColor(darkText).font('Helvetica-Bold')
          .text(formData.consultantEmail || 'info@yatrasutra.com', 0, yPos, { align: 'center', width: doc.page.width });
+      
+      // Official Address Section
+      yPos += 25;
+      doc.moveTo(120, yPos).lineTo(doc.page.width - 120, yPos).strokeColor('#e0e0e0').lineWidth(1).stroke();
+      
+      yPos += 15;
+      doc.fontSize(10).fillColor(grey).font('Helvetica')
+         .text('Office Address:', 0, yPos, { align: 'center', width: doc.page.width });
+      
+      yPos += 14;
+      doc.fontSize(9).fillColor(darkText).font('Helvetica')
+         .text('1st Floor, Penta Corner Building, Changampuzha Metro Station,', 0, yPos, { align: 'center', width: doc.page.width });
+      
+      yPos += 12;
+      doc.fontSize(9).fillColor(darkText).font('Helvetica')
+         .text('Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 0, yPos, { align: 'center', width: doc.page.width });
 
-      yPos += 65;
+      yPos += 45;
 
       doc.fontSize(14).fillColor(pink).font('Helvetica-Bold')
          .text('Thank you for choosing Yatrasutra Holidays!', 50, yPos, { align: 'center', width: doc.page.width - 100 });
