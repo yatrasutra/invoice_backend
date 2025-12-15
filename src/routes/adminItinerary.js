@@ -69,6 +69,7 @@ router.get('/itineraries', authenticateToken, requireAdmin, async (req, res) => 
 router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`📋 Starting approval process for itinerary: ${id}`);
 
     // Get submission
     const submission = await databases.getDocument(
@@ -76,15 +77,19 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
       config.itinerariesCollectionId,
       id
     );
+    console.log(`📄 Current submission status: ${submission.status}`);
 
     if (submission.status === 'approved') {
       return res.status(400).json({ error: 'Itinerary already approved' });
     }
 
     const formData = JSON.parse(submission.data);
+    console.log(`📝 Parsed form data for destination: ${formData.destination || 'N/A'}`);
 
     // Generate Itinerary PDF (new specification)
+    console.log('🎨 Generating PDF...');
     const pdfBuffer = await generateItineraryPDF(formData, submission.$id);
+    console.log(`✅ PDF generated successfully, size: ${pdfBuffer.length} bytes`);
 
     // Create a File object from the buffer
     const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
@@ -94,6 +99,7 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
     });
 
     // Upload PDF to Appwrite Storage
+    console.log('📤 Uploading PDF to storage...');
     const uploadedFile = await storage.createFile(
       config.bucketId,
       ID.unique(),
@@ -103,6 +109,7 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
         Permission.read(Role.any()) // Allow anyone with the link to read
       ]
     );
+    console.log(`✅ PDF uploaded successfully, file ID: ${uploadedFile.$id}`);
 
     // Get file URL
     const pdfUrl = `${process.env.APPWRITE_ENDPOINT}/storage/buckets/${config.bucketId}/files/${uploadedFile.$id}/view?project=${process.env.APPWRITE_PROJECT_ID}`;
@@ -111,6 +118,11 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
     const pdfFileId = uploadedFile.$id;
 
     // Update submission status
+    console.log('📝 Updating submission status to approved...');
+    console.log(`   Database ID: ${config.databaseId}`);
+    console.log(`   Collection ID: ${config.itinerariesCollectionId}`);
+    console.log(`   Document ID: ${id}`);
+    
     const updatedSubmission = await databases.updateDocument(
       config.databaseId,
       config.itinerariesCollectionId,
@@ -120,18 +132,41 @@ router.post('/itinerary/:id/approve', authenticateToken, requireAdmin, async (re
         pdfUrl: `${pdfFileId}|${pdfUrl}` // Store both file ID and URL separated by |
       }
     );
+    
+    console.log(`✅ Status update complete!`);
+    console.log(`   Updated status: ${updatedSubmission.status}`);
+    console.log(`   Updated pdfUrl: ${updatedSubmission.pdfUrl ? 'Set' : 'Not set'}`);
+
+    // Verify the update actually persisted by re-fetching
+    const verifySubmission = await databases.getDocument(
+      config.databaseId,
+      config.itinerariesCollectionId,
+      id
+    );
+    console.log(`🔍 Verification - Status in DB after update: ${verifySubmission.status}`);
+    
+    if (verifySubmission.status !== 'approved') {
+      console.error('❌ CRITICAL: Status update did not persist! Expected "approved", got:', verifySubmission.status);
+      return res.status(500).json({ 
+        error: 'Status update failed to persist in database',
+        expectedStatus: 'approved',
+        actualStatus: verifySubmission.status
+      });
+    }
 
     return res.json({
       message: 'Itinerary approved successfully',
       submissionId: updatedSubmission.$id,
-      status: 'approved',
+      status: verifySubmission.status, // Return the verified status from DB
       pdfUrl: pdfUrl,
       downloadUrl: `/api/itinerary/${updatedSubmission.$id}/download`
     });
 
   } catch (error) {
-    console.error('Error approving itinerary:', error);
-    return res.status(500).json({ error: 'Failed to approve itinerary' });
+    console.error('❌ Error approving itinerary:', error);
+    console.error('   Error message:', error.message);
+    console.error('   Error stack:', error.stack);
+    return res.status(500).json({ error: 'Failed to approve itinerary', details: error.message });
   }
 });
 
