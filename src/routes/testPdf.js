@@ -1,7 +1,102 @@
 import express from 'express';
 import { generateBrochurePDF } from '../utils/brochurePdfGenerator.js';
+import { generateItineraryPDF } from '../utils/itineraryPdfGenerator.js';
 
 const router = express.Router();
+
+// Sample itinerary data for testing the new itinerary PDF generator
+const sampleItineraryFormData = {
+  guestName: 'John Doe',
+  destination: 'Mysore',
+  startDate: '2025-12-16',
+  duration: '6',
+  adults: 2,
+  children: 0,
+  infants: 0,
+  tripId: 'TEST-001',
+  quotePrice: 45000,
+  paymentNote: '50% advance required',
+  
+  // Cover image - use a sample travel image URL
+  coverHeroImageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+  
+  hotels: [
+    {
+      name: 'Royal Orchid Brindavan Garden',
+      location: 'Mysore',
+      nightNumber: 1,
+      nightEnd: 3,
+      checkInDate: '2025-12-16',
+      starRating: 4,
+      numberOfRooms: 1,
+      roomType: 'Deluxe Room',
+      mealPlan: 'Breakfast & Dinner',
+      paxDistribution: '2 Adults',
+      imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400'
+    },
+    {
+      name: 'Radisson Blu Plaza',
+      location: 'Bangalore',
+      nightNumber: 4,
+      nightEnd: 5,
+      checkInDate: '2025-12-19',
+      starRating: 5,
+      numberOfRooms: 1,
+      roomType: 'Premium Suite',
+      mealPlan: 'All Meals',
+      paxDistribution: '2 Adults',
+      imageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400'
+    }
+  ],
+  
+  days: [
+    {
+      dayNumber: 1,
+      date: '2025-12-16',
+      title: 'Arrival in Mysore - City Welcome',
+      description: 'Arrive at Mysore Railway Station\nMeet and greet by our representative\nTransfer to the hotel and check-in\nEvening at leisure to explore local markets\nOvernight stay at hotel',
+      imageUrl: 'https://images.unsplash.com/photo-1600011689032-8b628b8a8747?w=600'
+    },
+    {
+      dayNumber: 2,
+      date: '2025-12-17',
+      title: 'Mysore Palace & Chamundi Hills',
+      description: 'Breakfast at hotel\nVisit the magnificent Mysore Palace\nExplore Chamundi Hills and temple\nLunch at a traditional restaurant\nVisit Brindavan Gardens in the evening\nMusical fountain show\nDinner and overnight stay',
+      imageUrl: 'https://images.unsplash.com/photo-1580667799535-3f9c3b4e9f63?w=600'
+    },
+    {
+      dayNumber: 3,
+      date: '2025-12-18',
+      title: 'Srirangapatna Historical Tour',
+      description: 'Breakfast at hotel\nDrive to Srirangapatna\nVisit Tipu Sultan Summer Palace\nExplore Gumbaz and historical sites\nReturn to Mysore\nShopping at Devaraja Market\nOvernight stay at hotel',
+      imageUrl: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=600'
+    }
+  ],
+  
+  inclusions: [
+    '5 Nights accommodation in listed hotels',
+    'Daily Breakfast at all hotels',
+    'Dinner at select hotels as mentioned',
+    'All transfers and sightseeing by private AC vehicle',
+    'Professional English-speaking driver',
+    'All parking fees and fuel charges',
+    'GST and all applicable taxes'
+  ],
+  
+  exclusions: [
+    'Airfare / Train tickets',
+    'Meals not mentioned in the itinerary',
+    'Entry fees to monuments and attractions',
+    'Personal expenses like tips, laundry, phone calls',
+    'Travel insurance',
+    'Anything not mentioned in inclusions'
+  ],
+  
+  consultantName: 'Priya Sharma',
+  consultantPosition: 'Senior Travel Advisor',
+  consultantMobile: '+91 97468 16609',
+  consultantEmail: 'priya@yatrasutra.com'
+};
 
 // Sample test data for quick PDF preview
 const sampleItineraryData = {
@@ -144,5 +239,76 @@ router.get('/pdf/sample-data', (req, res) => {
   });
 });
 
-export default router;
+// ============================================================
+// ITINERARY PDF TESTING ENDPOINTS (for itineraryPdfGenerator.js)
+// ============================================================
 
+/**
+ * GET /api/test/itinerary/preview
+ * Generate a test itinerary PDF with sample data
+ * Access directly in browser: http://localhost:5000/api/test/itinerary/preview
+ */
+router.get('/itinerary/preview', async (req, res) => {
+  try {
+    console.log('🎨 Generating itinerary preview PDF...');
+    
+    // Generate PDF with sample itinerary data
+    const pdfBuffer = await generateItineraryPDF(sampleItineraryFormData, 'ITINERARY-PREVIEW-' + Date.now());
+
+    // Set response headers to display in browser
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="preview-itinerary.pdf"');
+    
+    // Send the PDF
+    res.send(Buffer.from(pdfBuffer));
+    
+    console.log('✅ Itinerary preview PDF generated successfully!');
+  } catch (error) {
+    console.error('❌ Error generating itinerary preview PDF:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate itinerary preview PDF',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/test/itinerary/preview
+ * Generate a test itinerary PDF with custom data
+ * Send your own test data in the request body
+ */
+router.post('/itinerary/preview', async (req, res) => {
+  try {
+    const customData = req.body.data || sampleItineraryFormData;
+    
+    console.log('🎨 Generating itinerary preview PDF with custom data...');
+    
+    const pdfBuffer = await generateItineraryPDF(customData, 'CUSTOM-ITINERARY-' + Date.now());
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="preview-itinerary.pdf"');
+    
+    res.send(Buffer.from(pdfBuffer));
+    
+    console.log('✅ Custom itinerary preview PDF generated successfully!');
+  } catch (error) {
+    console.error('❌ Error generating custom itinerary preview PDF:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate itinerary preview PDF',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/test/itinerary/sample-data
+ * Get the sample itinerary data structure for testing
+ */
+router.get('/itinerary/sample-data', (req, res) => {
+  res.json({
+    message: 'Use this sample itinerary data structure for testing',
+    sampleData: sampleItineraryFormData
+  });
+});
+
+export default router;

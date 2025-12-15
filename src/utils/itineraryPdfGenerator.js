@@ -10,7 +10,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Generate an Itinerary PDF following We Care Holidays specification
+ * Generate a Premium Brochure-Style Itinerary PDF
+ * Inspired by Apple, Airbnb, and modern agency design aesthetics
  * @param {Object} formData - The itinerary data
  * @param {string} submissionId - The submission ID
  * @returns {Promise<Buffer>} - PDF buffer
@@ -31,14 +32,70 @@ export const generateItineraryPDF = async (formData, submissionId) => {
         resolve(pdfBuffer);
       });
 
-      // Brand colors matching the reference PDF design
-      const blue = '#1976D2'; // Blue for header and footer bar - matching header
-      const pink = '#E91E8C'; // Pink/rose for section headers
-      const darkText = '#2d3748';
-      const white = '#ffffff';
-      const grey = '#6b7280';
-      const lightGrey = '#f9f9f9';
-      const lightPink = '#FCE4EC'; // Light pink for backgrounds
+      // ═══════════════════════════════════════════════════════════════
+      // PREMIUM COLOR PALETTE - Minimal & Elegant
+      // Inspired by modern editorial design
+      // ═══════════════════════════════════════════════════════════════
+      const colors = {
+        // Primary brand colors
+        primary: '#0B4FA3',      // Professional blue (header/footer)
+        secondary: '#16213E',    // Rich dark blue
+        accent: '#E94560',       // Vibrant coral red
+        
+        // Text hierarchy
+        text: {
+          dark: '#1A1A2E',       // Primary text
+          medium: '#4A5568',     // Secondary text
+          light: '#718096',      // Tertiary/muted text
+          white: '#FFFFFF',      // Light text on dark bg
+        },
+        
+        // Background colors
+        bg: {
+          white: '#FFFFFF',
+          offWhite: '#FAFAFA',   // Subtle off-white
+          light: '#F7F8FA',      // Light grey
+          card: '#FFFFFF',       // Card backgrounds
+        },
+        
+        // Accent colors
+        success: '#10B981',      // Teal green
+        warning: '#F59E0B',      // Amber
+        info: '#3B82F6',         // Blue
+        
+        // Subtle design elements
+        border: '#E5E7EB',       // Light border
+        divider: '#D1D5DB',      // Divider lines
+      };
+
+      // Typography scale (rem-like system for consistency)
+      const type = {
+        h1: 28,
+        h2: 22,
+        h3: 16,
+        h4: 14,
+        body: 11,
+        small: 9,
+        tiny: 8,
+      };
+
+      // Spacing system
+      const space = {
+        xs: 8,
+        sm: 16,
+        md: 24,
+        lg: 32,
+        xl: 48,
+        xxl: 64,
+      };
+
+      // Page dimensions
+      const page = {
+        width: 595.28,
+        height: 841.89,
+        margin: 50,
+        contentWidth: 495.28, // width - (margin * 2)
+      };
 
       // Load header images
       const headerImage1Path = path.join(__dirname, '../assets/itenary/itenaryHeader.png');
@@ -95,8 +152,7 @@ export const generateItineraryPDF = async (formData, submissionId) => {
         });
       };
 
-
-      const addImageSafeSync = (doc, imageBuffer, x, y, options) => {
+      const addImageSafe = (doc, imageBuffer, x, y, options) => {
         try {
           if (imageBuffer) {
             doc.image(imageBuffer, x, y, options);
@@ -140,12 +196,16 @@ export const generateItineraryPDF = async (formData, submissionId) => {
         }
       }));
 
+      // ═══════════════════════════════════════════════════════════════
+      // HELPER FUNCTIONS - Clean Design Components
+      // ═══════════════════════════════════════════════════════════════
+
       const formatDate = (dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
         const months = ['January', 'February', 'March', 'April', 'May', 'June', 
                        'July', 'August', 'September', 'October', 'November', 'December'];
-        return `${date.getDate().toString().padStart(2, '0')} ${months[date.getMonth()]}, ${date.getFullYear()}`;
+        return `${date.getDate()} ${months[date.getMonth()]}, ${date.getFullYear()}`;
       };
 
       const formatShortDate = (dateString) => {
@@ -155,499 +215,768 @@ export const generateItineraryPDF = async (formData, submissionId) => {
         return `${date.getDate()} ${months[date.getMonth()]}`;
       };
 
-      const getOrdinal = (n) => {
-        const s = ['th', 'st', 'nd', 'rd'];
-        const v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      // Draw elegant card with subtle shadow
+      const drawCard = (doc, x, y, width, height, options = {}) => {
+        const { 
+          fill = colors.bg.card, 
+          shadow = true, 
+          radius = 0,
+          borderColor = null 
+        } = options;
+
+        if (shadow) {
+          // Subtle shadow effect
+          doc.save();
+          doc.opacity(0.04);
+          doc.rect(x + 2, y + 2, width, height).fill('#000000');
+          doc.restore();
+        }
+        
+        // Main card
+        doc.rect(x, y, width, height).fillColor(fill).fill();
+        
+        if (borderColor) {
+          doc.rect(x, y, width, height)
+             .strokeColor(borderColor)
+             .lineWidth(1)
+             .stroke();
+        }
       };
 
-      // Add styled footer to every page
-      const addStyledFooter = (doc, pageNum) => {
+      // Draw minimal divider line
+      const drawDivider = (doc, x, y, width, color = colors.border) => {
+        doc.moveTo(x, y)
+           .lineTo(x + width, y)
+           .strokeColor(color)
+           .lineWidth(1)
+           .stroke();
+      };
+
+      // Draw accent line (thicker, colored)
+      const drawAccentLine = (doc, x, y, width, color = colors.accent) => {
+        doc.moveTo(x, y)
+           .lineTo(x + width, y)
+           .strokeColor(color)
+           .lineWidth(3)
+           .stroke();
+      };
+
+      // ═══════════════════════════════════════════════════════════════
+      // PREMIUM FOOTER - Clean & Minimal (no page number)
+      // ═══════════════════════════════════════════════════════════════
+      const addFooter = (doc, pageNum) => {
         const footerHeight = 55;
         const footerY = doc.page.height - footerHeight;
         
-        // Blue footer background - matching header
-        doc.rect(0, footerY, doc.page.width, footerHeight).fillColor(blue).fill();
+        // Clean background
+        doc.rect(0, footerY, doc.page.width, footerHeight)
+           .fillColor(colors.primary)
+           .fill();
+        
+        // Subtle top accent line
+        doc.moveTo(0, footerY)
+           .lineTo(doc.page.width, footerY)
+           .strokeColor(colors.accent)
+           .lineWidth(2)
+           .stroke();
         
         // Footer logo on left
-        let logoWidth = 0;
+        let contentX = page.margin;
         if (footerLogoBuffer) {
           try {
-            doc.image(footerLogoBuffer, 15, footerY + 8, { height: 40 });
-            logoWidth = 60;
+            doc.image(footerLogoBuffer, contentX, footerY + 8, { height: 38 });
+            contentX += 60;
           } catch (e) {
             console.log('Footer logo error:', e.message);
           }
         }
         
-        // Contact info - Phone
-        const contactX = 15 + logoWidth + 10;
-        doc.fontSize(8).fillColor(white).font('Helvetica')
-           .text('+91 97468 16609', contactX, footerY + 12);
+        // Contact info - centered layout
+        contentX += 15;
+        doc.fontSize(type.tiny).fillColor(colors.text.white).font('Helvetica')
+           .text('+91 97468 16609  |  info@yatrasutra.com  |  www.yatrasutra.com', 
+                 contentX, footerY + 22, { lineGap: 0 });
         
-        // Email
-        doc.fontSize(8).fillColor(white).font('Helvetica')
-           .text('info@yatrasutra.com', contactX, footerY + 24);
-        
-        // Website
-        doc.fontSize(8).fillColor(white)
-           .text('www.yatrasutra.com', contactX, footerY + 36);
-        
-        // Page number center
-        doc.fontSize(9).fillColor(white).font('Helvetica-Bold')
-           .text(String(pageNum), 0, footerY + 22, { align: 'center', width: doc.page.width });
-        
-        // Social media links on right
-        const socialX = doc.page.width - 140;
-        doc.fontSize(8).fillColor(white).font('Helvetica')
-           .text('Follow us:', socialX, footerY + 12);
-        
-        // Facebook icon (f)
-        doc.fontSize(9).fillColor('#4267B2').font('Helvetica-Bold')
-           .text('f', socialX, footerY + 26);
-        doc.fontSize(8).fillColor(white).font('Helvetica')
-           .text(' Facebook', socialX + 8, footerY + 26, { 
-             link: 'https://m.facebook.com/61574118189623/',
-             underline: true 
-           });
-        
-        // Instagram icon
-        doc.fontSize(9).fillColor('#E1306C').font('Helvetica-Bold')
-           .text('@', socialX, footerY + 38);
-        doc.fontSize(8).fillColor(white).font('Helvetica')
-           .text(' Instagram', socialX + 10, footerY + 38, { 
-             link: 'https://www.instagram.com/yatra.sutra?igsh=ZGZ1NW1pZGxhbzJi',
-             underline: true 
-           });
+        // Social links on right (no page number circle)
+        const socialX = doc.page.width - page.margin - 140;
+        doc.fontSize(type.tiny).fillColor(colors.text.white).font('Helvetica')
+           .text('Follow us: ', socialX, footerY + 22);
+        doc.fontSize(type.tiny).fillColor(colors.accent).font('Helvetica')
+           .text('Facebook', socialX + 42, footerY + 22, { link: 'https://m.facebook.com/61574118189623/', underline: false });
+        doc.fontSize(type.tiny).fillColor(colors.text.white).font('Helvetica')
+           .text(' | ', socialX + 85, footerY + 22);
+        doc.fontSize(type.tiny).fillColor(colors.accent).font('Helvetica')
+           .text('Instagram', socialX + 95, footerY + 22, { link: 'https://www.instagram.com/yatra.sutra', underline: false });
       };
 
-      // Add header image to page
+      // ═══════════════════════════════════════════════════════════════
+      // HEADER COMPONENT - Modern with Image
+      // For secondary pages, use footer-style header with tagline
+      // ═══════════════════════════════════════════════════════════════
       const addHeader = (doc, isFirstPage = false) => {
-        const headerHeight = isFirstPage ? 200 : 60;
-        const headerBuffer = isFirstPage ? headerImage1Buffer : headerImage2Buffer;
-        
-        if (headerBuffer) {
-          try {
-            // Render image to fill full page width without fit constraints
-            doc.image(headerBuffer, 0, 0, { 
-              width: doc.page.width, 
-              height: headerHeight
-            });
-          } catch (e) {
-            doc.rect(0, 0, doc.page.width, headerHeight).fillColor(blue).fill();
+        if (isFirstPage) {
+          const headerHeight = 200;
+          if (headerImage1Buffer) {
+            try {
+              doc.image(headerImage1Buffer, 0, 0, { 
+                width: doc.page.width, 
+                height: headerHeight
+              });
+            } catch (e) {
+              // Fallback to solid color
+              doc.rect(0, 0, doc.page.width, headerHeight)
+                 .fillColor(colors.primary)
+                 .fill();
+            }
+          } else {
+            // Fallback header
+            doc.rect(0, 0, doc.page.width, headerHeight)
+               .fillColor(colors.primary)
+               .fill();
+            doc.fontSize(type.h2).fillColor(colors.text.white).font('Helvetica-Bold')
+               .text('YATRASUTRA HOLIDAYS', page.margin, headerHeight / 2 - 10);
           }
+          return headerHeight;
         } else {
-          doc.rect(0, 0, doc.page.width, headerHeight).fillColor(blue).fill();
-          doc.fontSize(24).fillColor(white).font('Helvetica-Bold')
-             .text('YATRASUTRA HOLIDAYS', 50, headerHeight / 2 - 10);
+          // Secondary header - footer-style design with elegant cursive tagline
+          const headerHeight = 55;
+          
+          // Clean background matching footer
+          doc.rect(0, 0, doc.page.width, headerHeight)
+             .fillColor(colors.primary)
+             .fill();
+          
+          // Subtle bottom accent line (like footer's top line)
+          doc.moveTo(0, headerHeight)
+             .lineTo(doc.page.width, headerHeight)
+             .strokeColor(colors.accent)
+             .lineWidth(2)
+             .stroke();
+          
+          // Header logo on left
+          let contentX = page.margin;
+          if (footerLogoBuffer) {
+            try {
+              doc.image(footerLogoBuffer, contentX, 8, { height: 38 });
+              contentX += 60;
+            } catch (e) {
+              console.log('Header logo error:', e.message);
+            }
+          }
+          
+          // Tagline - "We Handle The Chaos, You Just Pack" - modern elegant style with larger font
+          contentX += 30;
+          doc.fontSize(18).fillColor(colors.text.white).font('Helvetica-BoldOblique')
+             .text('We Handle The Chaos, You Just Pack', 
+                   contentX, 16, { characterSpacing: 1.0 });
+          
+          return headerHeight + 2; // Include accent line height
         }
-        return headerHeight;
       };
 
-      // ============================================================
-      // PAGE 1: COVER PAGE
-      // ============================================================
+      // ═══════════════════════════════════════════════════════════════
+      // PAGE 1: COVER PAGE - Premium Editorial Style
+      // ═══════════════════════════════════════════════════════════════
+      let currentPageNum = 1; // Page counter for proper numbering
       doc.addPage();
       let yPos = addHeader(doc, true);
-      yPos += 30;
+      
+      // Clean background
+      doc.rect(0, yPos, doc.page.width, doc.page.height - yPos - 55)
+         .fillColor(colors.bg.offWhite)
+         .fill();
+      
+      yPos += space.lg;
 
-      // Greeting
-      doc.fontSize(14).fillColor(darkText).font('Helvetica')
-         .text('Dear ', 50, yPos, { continued: true })
-         .font('Helvetica-Bold').text(`${formData.guestName || 'Guest'},`);
+      // Welcome section - minimal card
+      drawCard(doc, page.margin, yPos, page.contentWidth, 80, { shadow: true });
       
-      yPos += 30;
-      doc.fontSize(11).font('Helvetica').fillColor(darkText)
-         .text('Greetings from ', 50, yPos, { continued: true })
-         .font('Helvetica-Bold').text('Yatrasutra Holidays.');
+      yPos += space.md;
       
-      yPos += 25;
-      doc.fontSize(10).font('Helvetica').fillColor(darkText)
-         .text('Thank you for choosing ', 50, yPos, { continued: true, width: doc.page.width - 100 })
-         .font('Helvetica-Bold').text('Yatrasutra Holidays', { continued: true })
-         .font('Helvetica').text('. Below is your customized travel package. It\'s fully customizable to ensure it meets your desires. We\'re here to make your vacation unforgettable!', { width: doc.page.width - 100, lineGap: 4 });
+      // Greeting with elegant typography
+      doc.fontSize(type.h3).fillColor(colors.text.dark).font('Helvetica')
+         .text('Dear ', page.margin + space.md, yPos, { continued: true })
+         .font('Helvetica-Bold').fillColor(colors.accent)
+         .text(`${formData.guestName || 'Valued Guest'},`);
       
-      yPos += 45;
-      doc.font('Helvetica-Bold').fontSize(10).fillColor(darkText)
-         .text('You can find your personal trip planner\'s contact details at the end of the page.', 50, yPos, { width: doc.page.width - 100 });
+      yPos += space.md;
       
-      yPos += 25;
-      doc.font('Helvetica-Oblique').fontSize(9).fillColor(grey)
-         .text('Should you have any questions or require further assistance, please don\'t hesitate to reach out.', 50, yPos, { width: doc.page.width - 100 });
+      doc.fontSize(type.body).font('Helvetica').fillColor(colors.text.medium)
+         .text(`Thank you for choosing Yatrasutra Holidays. Below is your personalized travel itinerary.`, 
+               page.margin + space.md, yPos, { width: page.contentWidth - space.lg });
+      
+      yPos += space.xl + space.sm;
+      
+      // Accent line divider
+      drawAccentLine(doc, page.margin + 80, yPos, page.contentWidth - 160, colors.accent);
+      
+      yPos += space.lg;
 
-      yPos += 40;
-
-      // Trip Details Grid
-      const gridY = yPos;
-      const colWidth = (doc.page.width - 100) / 3;
+      // Trip Details - Grid Layout with clean design
+      drawCard(doc, page.margin, yPos, page.contentWidth, 140, { shadow: true });
+      
+      const gridY = yPos + space.md;
+      const colWidth = (page.contentWidth - space.lg) / 3;
       
       // Row 1
-      doc.fontSize(8).fillColor(grey).font('Helvetica').text('DESTINATION', 50, gridY);
-      doc.fontSize(8).text('START DATE', 50 + colWidth, gridY);
-      doc.fontSize(8).text('DURATION', 50 + colWidth * 2, gridY);
+      const drawDetailItem = (label, value, x, y, accentColor = colors.accent) => {
+        doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+           .text(label.toUpperCase(), x, y);
+        doc.fontSize(type.h4).fillColor(colors.text.dark).font('Helvetica-Bold')
+           .text(value, x, y + 14);
+        // Accent underline
+        drawAccentLine(doc, x, y + 38, colWidth - 30, accentColor);
+      };
       
-      doc.fontSize(13).fillColor(darkText).font('Helvetica-Bold')
-         .text(formData.destination || 'N/A', 50, gridY + 15)
-         .text(formatDate(formData.startDate), 50 + colWidth, gridY + 15)
-         .text(formData.duration || 'N/A', 50 + colWidth * 2, gridY + 15);
-
-      yPos = gridY + 45;
-
-      // Row 2
-      doc.fontSize(8).fillColor(grey).font('Helvetica').text('PAX', 50, yPos);
-      doc.fontSize(8).text('TRIP ID', 50 + colWidth, yPos);
+      const col1X = page.margin + space.md;
+      const col2X = col1X + colWidth;
+      const col3X = col2X + colWidth;
       
-      const paxText = `${formData.adults || 0} Adults${formData.children ? `, ${formData.children} Children` : ''}${formData.infants ? `, ${formData.infants} Infants` : ''}`;
-      doc.fontSize(13).fillColor(darkText).font('Helvetica-Bold')
-         .text(paxText, 50, yPos + 15)
-         .text(formData.tripId || 'N/A', 50 + colWidth, yPos + 15);
-
-      yPos += 55;
-
-      // Divider line
-      doc.moveTo(50, yPos).lineTo(doc.page.width - 50, yPos).strokeColor('#e0e0e0').lineWidth(1).stroke();
-
-      yPos += 15;
-
-      // Quote Price Section
-      doc.fontSize(9).fillColor(grey).font('Helvetica')
-         .text('QUOTE PRICE (2 PACKAGE CATEGORIES/OPTIONS)', 50, yPos);
+      drawDetailItem('DESTINATION', formData.destination || 'N/A', col1X, gridY, colors.accent);
+      drawDetailItem('START DATE', formatDate(formData.startDate), col2X, gridY, colors.info);
+      drawDetailItem('DURATION', formData.duration || 'N/A', col3X, gridY, colors.success);
       
-      yPos += 20;
+      const row2Y = gridY + space.xl + space.sm;
+      drawDetailItem('TRAVELERS', `${formData.adults || 0} Adults${formData.children ? ` + ${formData.children} Children` : ''}`, 
+                     col1X, row2Y, colors.primary);
+      drawDetailItem('TRIP ID', formData.tripId || 'N/A', col2X, row2Y, colors.secondary);
 
-      // Price table header
-      doc.rect(50, yPos, doc.page.width - 100, 25).fillColor(lightGrey).fill();
-      doc.fontSize(9).fillColor(darkText).font('Helvetica-Bold')
-         .text('#', 60, yPos + 8)
-         .text('Option', 90, yPos + 8)
-         .text('Total (INR)', 300, yPos + 8);
+      yPos += 165;
 
-      yPos += 25;
-
-      // Price row
-      doc.rect(50, yPos, doc.page.width - 100, 65).fillColor(white).fill().strokeColor('#e0e0e0').lineWidth(1).stroke();
-      doc.fontSize(10).fillColor(darkText).font('Helvetica')
-         .text('1', 60, yPos + 22);
-      doc.font('Helvetica-Bold').text('Premium Package', 90, yPos + 22);
+      // Package Pricing Section
+      doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+         .text('PACKAGE PRICING', page.margin + space.md, yPos);
       
-      // Price display
-      doc.fontSize(22).fillColor(pink).font('Helvetica-Bold')
-         .text(`${(formData.quotePrice || 0).toLocaleString('en-IN')} /-`, 300, yPos + 14);
-      doc.fontSize(8).fillColor(grey).font('Helvetica')
-         .text('(including GST)', 300, yPos + 38);
+      yPos += space.sm;
+
+      // Price card with accent header
+      drawCard(doc, page.margin, yPos, page.contentWidth, 85, { shadow: true });
       
+      // Accent header bar
+      doc.rect(page.margin, yPos, page.contentWidth, 32)
+         .fillColor(colors.accent)
+         .fill();
+      
+      doc.fontSize(type.body).fillColor(colors.text.white).font('Helvetica-Bold')
+         .text('Premium Package', page.margin + space.md, yPos + 10);
+      doc.fontSize(type.tiny).fillColor(colors.text.white).font('Helvetica')
+         .text('All-Inclusive', doc.page.width - page.margin - 100, yPos + 12);
+      
+      yPos += 42;
+      
+      // Large price display (fix: use INR text to avoid font issues with rupee symbol)
+      const formattedPrice = (formData.quotePrice || 0).toLocaleString('en-IN');
+      
+      // Draw rupee symbol separately to avoid font encoding issues
+      doc.fontSize(type.h1).fillColor(colors.accent).font('Helvetica-Bold')
+         .text('INR ', page.margin + space.md, yPos, { continued: true })
+         .text(formattedPrice);
+      
+      doc.fontSize(type.small).fillColor(colors.text.light).font('Helvetica')
+         .text('inclusive of all taxes', page.margin + space.md, yPos + 28);
+      
+      // Payment note (if exists)
       if (formData.paymentNote) {
-        doc.fontSize(8).fillColor('#D32F2F').font('Helvetica-Bold')
-           .text(formData.paymentNote, 300, yPos + 50);
+        doc.fontSize(type.small).fillColor(colors.warning).font('Helvetica-Bold')
+           .text(formData.paymentNote, doc.page.width - page.margin - 200, yPos + 10, {
+             width: 180,
+             align: 'right'
+           });
       }
 
-      addStyledFooter(doc, 1);
+      addFooter(doc, currentPageNum);
 
-      // ============================================================
-      // PAGE 2+: HOTELS / ACCOMMODATIONS
-      // ============================================================
+      // ═══════════════════════════════════════════════════════════════
+      // PAGE 2+: HOTELS - Magazine Style Layout
+      // ═══════════════════════════════════════════════════════════════
       const hotels = formData.hotels || [];
       if (hotels.length > 0) {
+        currentPageNum++;
         doc.addPage();
         yPos = addHeader(doc, false);
-        yPos += 20;
-
-        // Section header with pink bar
-        doc.rect(50, yPos, doc.page.width - 100, 35).fillColor(lightPink).fill();
-        doc.fontSize(13).fillColor(pink).font('Helvetica-Bold')
-           .text('Hotels / Accommodations', 60, yPos + 10);
-        doc.fontSize(11).fillColor(pink).text('Option 1: Premium Package', 360, yPos + 11);
         
-        yPos += 45;
+        // Background
+        doc.rect(0, yPos, doc.page.width, doc.page.height - yPos - 55)
+           .fillColor(colors.bg.offWhite)
+           .fill();
+        
+        yPos += space.md;
+
+        // Section header
+        drawCard(doc, page.margin, yPos, page.contentWidth, 42, { shadow: false });
+        drawAccentLine(doc, page.margin, yPos, page.contentWidth, colors.accent);
+        
+        doc.fontSize(type.h3).fillColor(colors.text.dark).font('Helvetica-Bold')
+           .text('Hotels & Accommodations', page.margin + space.sm, yPos + 14);
+        doc.fontSize(type.small).fillColor(colors.accent).font('Helvetica')
+           .text('Premium Selection', doc.page.width - page.margin - 120, yPos + 16);
+        
+        yPos += 55;
 
         for (let i = 0; i < hotels.length; i++) {
           const hotel = hotels[i];
           
+          // Check for page break
           if (yPos > 620) {
-            addStyledFooter(doc, 2);
+            addFooter(doc, currentPageNum);
+            currentPageNum++;
             doc.addPage();
             yPos = addHeader(doc, false);
-            yPos += 30;
+            doc.rect(0, yPos, doc.page.width, doc.page.height - yPos - 55)
+               .fillColor(colors.bg.offWhite).fill();
+            yPos += space.md;
           }
 
-          // Night badges
+          // Hotel Card
+          const cardHeight = 150;
+          drawCard(doc, page.margin, yPos, page.contentWidth, cardHeight, { shadow: true });
+          
+          // Night indicator badges
           const nightStart = hotel.nightNumber || (i + 1);
           const nightEnd = hotel.nightEnd || nightStart;
           
-          let badgeX = 50;
+          let badgeX = page.margin + space.sm;
           for (let n = nightStart; n <= nightEnd; n++) {
-            const badgeText = getOrdinal(n);
-            doc.rect(badgeX, yPos, 38, 22).fillColor(pink).fill();
-            doc.fontSize(9).fillColor(white).font('Helvetica-Bold')
-               .text(badgeText, badgeX + 7, yPos + 6);
-            badgeX += 43;
+            doc.circle(badgeX + 12, yPos + 18, 12)
+               .fillColor(colors.accent)
+               .fill();
+            doc.fontSize(type.small).fillColor(colors.text.white).font('Helvetica-Bold')
+               .text(String(n), badgeX + 8, yPos + 13);
+            badgeX += 28;
           }
           
-          doc.fontSize(11).fillColor(darkText).font('Helvetica')
-             .text(`Nights at `, badgeX + 5, yPos + 4, { continued: true })
-             .font('Helvetica-Bold').text(hotel.location || formData.destination);
+          // Location text
+          doc.fontSize(type.small).fillColor(colors.text.medium).font('Helvetica')
+             .text(`Nights at `, badgeX + 5, yPos + 14, { continued: true })
+             .font('Helvetica-Bold').fillColor(colors.text.dark)
+             .text(hotel.location || formData.destination);
           
-          doc.fontSize(8).fillColor(grey).font('Helvetica')
-             .text(`Check-in on ${formatShortDate(hotel.checkInDate)}`, 50, yPos + 28);
+          // Check-in date
+          doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica')
+             .text(`Check-in: ${formatShortDate(hotel.checkInDate)}`, badgeX + 5, yPos + 30);
 
-          yPos += 50;
+          yPos += 48;
 
-          // Hotel name and star rating
-          doc.fontSize(15).fillColor(pink).font('Helvetica-Bold')
-             .text(hotel.name || 'Hotel Name', 50, yPos);
+          // Hotel name - prominent
+          doc.fontSize(type.h3 + 2).fillColor(colors.accent).font('Helvetica-Bold')
+             .text(hotel.name || 'Hotel Name', page.margin + space.sm, yPos);
           
-          yPos += 20;
+          yPos += space.md;
           
-          // Star rating display - using asterisks for better PDF compatibility
+          // Star rating - use text-based rating to avoid font encoding issues
           const stars = parseInt(hotel.starRating) || 3;
-          let starText = '';
-          for (let s = 0; s < stars; s++) {
-            starText += '*';
-          }
-          doc.fontSize(13).fillColor('#FFA726').font('Helvetica-Bold').text(`${stars} Star Hotel`, 50, yPos);
-
-          yPos += 27;
-
-          // Room details in two columns
-          const leftCol = 50;
-          const rightCol = 180;
           
-          doc.fontSize(9).fillColor(grey).font('Helvetica').text('ROOMS', leftCol, yPos);
-          doc.text('MEAL PLAN', rightCol, yPos);
+          // Draw star rating as text (avoids unicode symbol issues)
+          doc.fontSize(type.body).fillColor(colors.warning).font('Helvetica-Bold')
+             .text(`${stars}-Star`, page.margin + space.sm, yPos);
           
-          yPos += 14;
-          doc.fontSize(11).fillColor(darkText).font('Helvetica-Bold')
-             .text(`${hotel.numberOfRooms || 1} ${hotel.roomType || 'Standard Room'}`, leftCol, yPos);
-          doc.text(hotel.mealPlan || 'Breakfast', rightCol, yPos);
-          
-          yPos += 16;
-          doc.fontSize(9).fillColor(grey).font('Helvetica')
-             .text(hotel.paxDistribution || `${formData.adults || 2} Pax + 1 Child without Extra Bed/Mattress`, leftCol, yPos, { width: 120 });
+          // Draw "Hotel" text next to rating
+          const ratingWidth = doc.widthOfString(`${stars}-Star`);
+          doc.fontSize(type.body).fillColor(colors.text.medium).font('Helvetica')
+             .text(' Hotel', page.margin + space.sm + ratingWidth, yPos);
 
-          // Hotel image on right - larger and better positioned
+          yPos += space.md;
+
+          // Room details - clean grid
+          const detailsY = yPos;
+          doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+             .text('ROOMS', page.margin + space.sm, detailsY);
+          doc.fontSize(type.body).fillColor(colors.text.dark).font('Helvetica-Bold')
+             .text(`${hotel.numberOfRooms || 1} × ${hotel.roomType || 'Standard Room'}`, page.margin + space.sm, detailsY + 12);
+          
+          doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+             .text('MEAL PLAN', page.margin + 160, detailsY);
+          doc.fontSize(type.body).fillColor(colors.text.dark).font('Helvetica-Bold')
+             .text(hotel.mealPlan || 'Breakfast', page.margin + 160, detailsY + 12);
+          
+          // Pax info
+          doc.fontSize(type.small).fillColor(colors.text.light).font('Helvetica')
+             .text(hotel.paxDistribution || `${formData.adults || 2} Adults`, page.margin + space.sm, detailsY + 30);
+
+          // Hotel image - modern framing
           if (imageCache[`hotel${i}`]) {
-            const imgX = doc.page.width - 200;
-            const imgY = yPos - 85;
-            addImageSafeSync(doc, imageCache[`hotel${i}`], imgX, imgY, {
-              width: 150,
-              height: 110,
-              fit: [150, 110]
+            const imgX = doc.page.width - page.margin - 145;
+            const imgY = yPos - 70;
+            
+            addImageSafe(doc, imageCache[`hotel${i}`], imgX, imgY, {
+              width: 130,
+              height: 100,
+              fit: [130, 100]
             });
           }
 
-          yPos += 35;
+          yPos += 60;
           
-          // Divider
-          doc.moveTo(50, yPos).lineTo(doc.page.width - 50, yPos).strokeColor('#e0e0e0').lineWidth(1).stroke();
-          yPos += 20;
+          // Divider between hotels
+          if (i < hotels.length - 1) {
+            drawDivider(doc, page.margin + space.lg, yPos, page.contentWidth - space.xl, colors.border);
+            yPos += space.md;
+          }
         }
         
-        addStyledFooter(doc, 2);
+        addFooter(doc, currentPageNum);
       }
 
-      // ============================================================
-      // DAY-WISE ITINERARY
-      // ============================================================
+      // ═══════════════════════════════════════════════════════════════
+      // DAY-WISE ITINERARY - Clean Timeline Style
+      // ═══════════════════════════════════════════════════════════════
       const days = formData.days || [];
       for (let i = 0; i < days.length; i++) {
         const day = days[i];
         
+        currentPageNum++;
         doc.addPage();
-        yPos = addHeader(doc, false);
-        yPos += 20;
-
-        // Day section header with pink background
-        doc.rect(50, yPos, doc.page.width - 100, 35).fillColor(lightPink).fill();
-        doc.fontSize(13).fillColor(pink).font('Helvetica-Bold')
-           .text(`${getOrdinal(day.dayNumber || i + 1)} Day`, 60, yPos + 10);
+        const headerH = addHeader(doc, false);
         
+        // Background
+        doc.rect(0, headerH, doc.page.width, doc.page.height - headerH - 55)
+           .fillColor(colors.bg.offWhite)
+           .fill();
+        
+        yPos = headerH + space.md;
+
+        // Day header
+        drawCard(doc, page.margin, yPos, page.contentWidth, 45, { shadow: false });
+        drawAccentLine(doc, page.margin, yPos, page.contentWidth, colors.info);
+        
+        // Day number badge
+        doc.circle(page.margin + 25, yPos + 23, 15)
+           .fillColor(colors.accent)
+           .fill();
+        doc.fontSize(type.body).fillColor(colors.text.white).font('Helvetica-Bold')
+           .text(String(day.dayNumber || i + 1), page.margin + 20, yPos + 18);
+        
+        // Day label
+        doc.fontSize(type.h4).fillColor(colors.text.dark).font('Helvetica-Bold')
+           .text(`Day ${day.dayNumber || i + 1}`, page.margin + 50, yPos + 16);
+        
+        // Date on right
         if (day.date) {
-          doc.fontSize(11).fillColor(pink).text(formatDate(day.date), doc.page.width - 200, yPos + 11);
+          doc.fontSize(type.body).fillColor(colors.accent).font('Helvetica-Bold')
+             .text(formatDate(day.date), doc.page.width - page.margin - 150, yPos + 17);
         }
-
-        yPos += 50;
-
-        // Day title
-        yPos += 10;
-        doc.fontSize(16).fillColor(pink).font('Helvetica-Bold')
-           .text(day.title || 'Day Itinerary', 50, yPos);
         
-        yPos += 30;
+        yPos += 60;
+
+        // Day title - large and prominent
+        doc.fontSize(type.h2).fillColor(colors.accent).font('Helvetica-Bold')
+           .text(day.title || 'Day Itinerary', page.margin + space.sm, yPos);
         
-        // Day description
+        yPos += space.lg;
+        
+        // Description as bullet points
         const description = day.description || '';
         const bulletPoints = description.split('\n').filter(line => line.trim());
         
-        doc.fontSize(10).fillColor(darkText).font('Helvetica');
-        bulletPoints.forEach((point) => {
-          if (yPos > 680) {
-            addStyledFooter(doc, 3 + i);
+        if (bulletPoints.length > 0) {
+          drawCard(doc, page.margin, yPos, page.contentWidth, 
+                   Math.min(bulletPoints.length * 28 + 30, 350), { shadow: true });
+          
+          yPos += space.sm;
+          
+          doc.fontSize(type.body).fillColor(colors.text.dark).font('Helvetica');
+          bulletPoints.forEach((point) => {
+            if (yPos > 680) {
+              addFooter(doc, currentPageNum);
+              currentPageNum++;
+              doc.addPage();
+              yPos = addHeader(doc, false) + space.md;
+              doc.rect(0, yPos - space.md, doc.page.width, doc.page.height - yPos + space.md - 55)
+                 .fillColor(colors.bg.offWhite).fill();
+            }
+            
+            const cleanPoint = point.replace(/^[•\-\*]\s*/, '').trim();
+            
+            // Minimal bullet point
+            doc.circle(page.margin + space.sm + 3, yPos + 5, 3)
+               .fillColor(colors.accent)
+               .fill();
+            
+            doc.text(cleanPoint, page.margin + space.lg, yPos, {
+              width: page.contentWidth - space.xl,
+              lineGap: 3
+            });
+            yPos += 25;
+          });
+        }
+
+        // Day image with clean presentation
+        if (imageCache[`day${i}`]) {
+          yPos += space.md;
+          
+          if (yPos > 550) {
+            addFooter(doc, currentPageNum);
+            currentPageNum++;
             doc.addPage();
-            yPos = addHeader(doc, false);
-            yPos += 30;
+            yPos = addHeader(doc, false) + space.md;
+            doc.rect(0, yPos - space.md, doc.page.width, doc.page.height - yPos + space.md - 55)
+               .fillColor(colors.bg.offWhite).fill();
           }
           
-          const cleanPoint = point.replace(/^[•\-\*]\s*/, '').trim();
-          doc.text(`• ${cleanPoint}`, 60, yPos, {
-            width: doc.page.width - 120,
-            lineGap: 4
+          const imgWidth = page.contentWidth - space.lg;
+          const imgHeight = 180;
+          
+          // Clean image presentation
+          addImageSafe(doc, imageCache[`day${i}`], page.margin + space.sm, yPos, {
+            width: imgWidth,
+            height: imgHeight,
+            fit: [imgWidth, imgHeight]
           });
-          yPos += 20;
-        });
-
-        // Day image - larger and more prominent
-        if (imageCache[`day${i}`]) {
-          yPos += 25;
-          addImageSafeSync(doc, imageCache[`day${i}`], 50, yPos, {
-            width: doc.page.width - 100,
-            height: 220,
-            fit: [doc.page.width - 100, 220]
-          });
-          yPos += 230;
+          
+          yPos += imgHeight + space.sm;
         }
 
-        addStyledFooter(doc, 3 + i);
+        addFooter(doc, currentPageNum);
       }
 
-      // ============================================================
-      // INCLUSIONS & EXCLUSIONS
-      // ============================================================
+      // ═══════════════════════════════════════════════════════════════
+      // INCLUSIONS & EXCLUSIONS - Two Column Layout
+      // ═══════════════════════════════════════════════════════════════
+      currentPageNum++;
       doc.addPage();
-      yPos = addHeader(doc, false);
-      yPos += 20;
-
-      doc.rect(50, yPos, doc.page.width - 100, 35).fillColor(lightPink).fill();
-      doc.fontSize(13).fillColor(pink).font('Helvetica-Bold')
-         .text('Inclusions and Exclusions', 60, yPos + 10);
-
-      yPos += 50;
-
-      const columnWidth = (doc.page.width - 120) / 2;
+      const incExcHeaderH = addHeader(doc, false);
       
-      // Inclusions
-      doc.fontSize(12).fillColor(pink).font('Helvetica-Bold').text('INCLUSIONS', 50, yPos);
-      let incY = yPos + 22;
+      doc.rect(0, incExcHeaderH, doc.page.width, doc.page.height - incExcHeaderH - 55)
+         .fillColor(colors.bg.offWhite)
+         .fill();
       
-      doc.fontSize(10).fillColor(darkText).font('Helvetica');
-      (formData.inclusions || []).forEach((item) => {
-        const cleanItem = decodeHTMLEntities(item);
-        const textHeight = doc.heightOfString(`• ${cleanItem}`, { width: columnWidth - 10, lineGap: 4 });
-        doc.text(`• ${cleanItem}`, 55, incY, { width: columnWidth - 10, lineGap: 4 });
-        incY += Math.max(textHeight + 8, 28);
-      });
+      yPos = incExcHeaderH + space.md;
 
-      // Exclusions
-      doc.fontSize(12).fillColor(pink).font('Helvetica-Bold').text('EXCLUSIONS', 50 + columnWidth + 20, yPos);
-      let excY = yPos + 22;
+      // Section header
+      drawCard(doc, page.margin, yPos, page.contentWidth, 42, { shadow: false });
+      drawAccentLine(doc, page.margin, yPos, page.contentWidth, colors.success);
       
-      doc.fontSize(10).fillColor(darkText).font('Helvetica');
-      (formData.exclusions || []).forEach((item) => {
-        const cleanItem = decodeHTMLEntities(item);
-        const textHeight = doc.heightOfString(`• ${cleanItem}`, { width: columnWidth - 10, lineGap: 4 });
-        doc.text(`• ${cleanItem}`, 55 + columnWidth + 20, excY, { width: columnWidth - 10, lineGap: 4 });
-        excY += Math.max(textHeight + 8, 28);
-      });
-
-      addStyledFooter(doc, 4 + days.length);
-
-      // ============================================================
-      // TERMS & CONDITIONS + POLICIES
-      // ============================================================
-      doc.addPage();
-      yPos = addHeader(doc, false);
-      yPos += 20;
-
-      doc.rect(50, yPos, doc.page.width - 100, 35).fillColor(lightPink).fill();
-      doc.fontSize(13).fillColor(pink).font('Helvetica-Bold')
-         .text('Terms and Conditions', 60, yPos + 10);
-
-      yPos += 50;
-      
-      doc.fontSize(10).fillColor(darkText).font('Helvetica');
-      bookingPolicy.termsAndConditions.forEach((term) => {
-        const cleanTerm = decodeHTMLEntities(term);
-        const termHeight = doc.heightOfString(`• ${cleanTerm}`, { width: doc.page.width - 120, lineGap: 5 });
-        
-        // Check if we need a new page
-        if (yPos + termHeight > 680) {
-          addStyledFooter(doc, 5 + days.length);
-          doc.addPage();
-          yPos = addHeader(doc, false);
-          yPos += 30;
-        }
-        
-        doc.text(`• ${cleanTerm}`, 60, yPos, { width: doc.page.width - 120, lineGap: 5, align: 'left' });
-        yPos += termHeight + 12;
-      });
-
-      addStyledFooter(doc, 5 + days.length);
-
-      // ============================================================
-      // CONSULTANT SIGN-OFF
-      // ============================================================
-      doc.addPage();
-      yPos = addHeader(doc, false);
-      yPos += 40;
-
-      doc.fontSize(18).fillColor(pink).font('Helvetica-Bold')
-         .text('Your Trip Planner', 50, yPos, { align: 'center', width: doc.page.width - 100 });
+      doc.fontSize(type.h3).fillColor(colors.text.dark).font('Helvetica-Bold')
+         .text("What's Included & Excluded", page.margin + space.sm, yPos + 14);
 
       yPos += 55;
 
-      // Consultant card - expanded for address
-      doc.rect(80, yPos, doc.page.width - 160, 260).fillColor(lightPink).fill()
-         .strokeColor(pink).lineWidth(2).stroke();
+      const columnWidth = (page.contentWidth - space.md) / 2;
+      
+      // Inclusions Card
+      const incCardX = page.margin;
+      drawCard(doc, incCardX, yPos, columnWidth, 380, { shadow: true });
+      
+      // Green header
+      doc.rect(incCardX, yPos, columnWidth, 32)
+         .fillColor(colors.success)
+         .fill();
+      doc.fontSize(type.body).fillColor(colors.text.white).font('Helvetica-Bold')
+         .text('✓  INCLUSIONS', incCardX + space.sm, yPos + 10);
+      
+      let incY = yPos + 45;
+      
+      doc.fontSize(type.small).fillColor(colors.text.dark).font('Helvetica');
+      (formData.inclusions || []).forEach((item) => {
+        const cleanItem = decodeHTMLEntities(item);
+        
+        // Green bullet
+        doc.circle(incCardX + space.sm + 3, incY + 4, 3)
+           .fillColor(colors.success)
+           .fill();
+        
+        const textHeight = doc.heightOfString(cleanItem, { width: columnWidth - 45, lineGap: 3 });
+        doc.text(cleanItem, incCardX + space.lg, incY, { width: columnWidth - 45, lineGap: 3 });
+        incY += Math.max(textHeight + 12, 22);
+      });
 
-      yPos += 25;
-      doc.fontSize(16).fillColor(darkText).font('Helvetica-Bold')
+      // Exclusions Card
+      const excCardX = page.margin + columnWidth + space.md;
+      drawCard(doc, excCardX, yPos, columnWidth, 380, { shadow: true });
+      
+      // Red header
+      doc.rect(excCardX, yPos, columnWidth, 32)
+         .fillColor('#EF4444')
+         .fill();
+      doc.fontSize(type.body).fillColor(colors.text.white).font('Helvetica-Bold')
+         .text('✗  EXCLUSIONS', excCardX + space.sm, yPos + 10);
+      
+      let excY = yPos + 45;
+      
+      doc.fontSize(type.small).fillColor(colors.text.dark).font('Helvetica');
+      (formData.exclusions || []).forEach((item) => {
+        const cleanItem = decodeHTMLEntities(item);
+        
+        // Red bullet
+        doc.circle(excCardX + space.sm + 3, excY + 4, 3)
+           .fillColor('#EF4444')
+           .fill();
+        
+        const textHeight = doc.heightOfString(cleanItem, { width: columnWidth - 45, lineGap: 3 });
+        doc.text(cleanItem, excCardX + space.lg, excY, { width: columnWidth - 45, lineGap: 3 });
+        excY += Math.max(textHeight + 12, 22);
+      });
+
+      addFooter(doc, currentPageNum);
+
+      // ═══════════════════════════════════════════════════════════════
+      // TERMS & CONDITIONS - Clean List Style
+      // ═══════════════════════════════════════════════════════════════
+      currentPageNum++;
+      doc.addPage();
+      const termsHeaderH = addHeader(doc, false);
+      
+      doc.rect(0, termsHeaderH, doc.page.width, doc.page.height - termsHeaderH - 55)
+         .fillColor(colors.bg.offWhite)
+         .fill();
+      
+      yPos = termsHeaderH + space.md;
+
+      // Section header
+      drawCard(doc, page.margin, yPos, page.contentWidth, 42, { shadow: false });
+      drawAccentLine(doc, page.margin, yPos, page.contentWidth, colors.primary);
+      
+      doc.fontSize(type.h3).fillColor(colors.text.dark).font('Helvetica-Bold')
+         .text('Terms & Conditions', page.margin + space.sm, yPos + 14);
+
+      yPos += 55;
+      
+      // Terms card
+      drawCard(doc, page.margin, yPos, page.contentWidth, 480, { shadow: true });
+      yPos += space.md;
+      
+      doc.fontSize(type.small).fillColor(colors.text.dark).font('Helvetica');
+      bookingPolicy.termsAndConditions.forEach((term, idx) => {
+        const cleanTerm = decodeHTMLEntities(term);
+        const termHeight = doc.heightOfString(cleanTerm, { width: page.contentWidth - 60, lineGap: 4 });
+        
+        // Check for page break
+        if (yPos + termHeight > 680) {
+          addFooter(doc, currentPageNum);
+          currentPageNum++;
+          doc.addPage();
+          yPos = addHeader(doc, false) + space.md;
+          doc.rect(0, yPos - space.md, doc.page.width, doc.page.height - yPos + space.md - 55)
+             .fillColor(colors.bg.offWhite).fill();
+          drawCard(doc, page.margin, yPos, page.contentWidth, 480, { shadow: true });
+          yPos += space.md;
+        }
+        
+        // Numbered bullet - minimal circle
+        doc.circle(page.margin + space.md, yPos + 5, 8)
+           .fillColor(colors.bg.light)
+           .fill();
+        doc.fontSize(type.tiny).fillColor(colors.text.dark).font('Helvetica-Bold')
+           .text(String(idx + 1), page.margin + space.md - 4, yPos + 2);
+        
+        doc.fontSize(type.small).fillColor(colors.text.dark).font('Helvetica')
+           .text(cleanTerm, page.margin + 45, yPos, { width: page.contentWidth - 60, lineGap: 4 });
+        yPos += termHeight + 16;
+      });
+
+      addFooter(doc, currentPageNum);
+
+      // ═══════════════════════════════════════════════════════════════
+      // CONSULTANT PAGE - Premium Sign-off
+      // ═══════════════════════════════════════════════════════════════
+      currentPageNum++;
+      doc.addPage();
+      const signoffHeaderH = addHeader(doc, false);
+      
+      doc.rect(0, signoffHeaderH, doc.page.width, doc.page.height - signoffHeaderH - 55)
+         .fillColor(colors.bg.offWhite)
+         .fill();
+      
+      yPos = signoffHeaderH + space.xl;
+
+      // Main title
+      doc.fontSize(type.h2).fillColor(colors.accent).font('Helvetica-Bold')
+         .text('Your Travel Expert', 0, yPos, { align: 'center', width: doc.page.width });
+      
+      yPos += space.sm;
+      drawAccentLine(doc, (doc.page.width / 2) - 40, yPos, 80, colors.accent);
+
+      yPos += space.lg;
+
+      // Consultant card
+      const consultantCardY = yPos;
+      const cardWidth = 320;
+      const cardX = (doc.page.width - cardWidth) / 2;
+      
+      drawCard(doc, cardX, consultantCardY, cardWidth, 260, { shadow: true });
+      
+      // Accent top bar
+      doc.rect(cardX, consultantCardY, cardWidth, 6)
+         .fillColor(colors.accent)
+         .fill();
+
+      yPos = consultantCardY + space.lg;
+      
+      // Consultant name
+      doc.fontSize(type.h3).fillColor(colors.text.dark).font('Helvetica-Bold')
          .text(formData.consultantName || 'Travel Consultant', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 22;
-      doc.fontSize(11).fillColor(grey).font('Helvetica')
+      yPos += space.md;
+      doc.fontSize(type.body).fillColor(colors.text.medium).font('Helvetica')
          .text(formData.consultantPosition || 'Senior Travel Advisor', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 25;
-      doc.fontSize(10).fillColor(grey).font('Helvetica')
-         .text('Mobile:', 0, yPos, { align: 'center', width: doc.page.width });
+      yPos += space.lg;
+      
+      // Contact boxes
+      const boxWidth = 180;
+      const boxX = (doc.page.width - boxWidth) / 2;
+      
+      // Phone
+      doc.rect(boxX, yPos, boxWidth, 35)
+         .fillColor(colors.bg.light)
+         .fill();
+      doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+         .text('MOBILE', 0, yPos + 8, { align: 'center', width: doc.page.width });
+      doc.fontSize(type.body).fillColor(colors.accent).font('Helvetica-Bold')
+         .text(formData.consultantMobile || '+91 97468 16609', 0, yPos + 20, { align: 'center', width: doc.page.width });
+      
+      yPos += 45;
+      
+      // Email
+      doc.rect(boxX, yPos, boxWidth, 35)
+         .fillColor(colors.bg.light)
+         .fill();
+      doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+         .text('EMAIL', 0, yPos + 8, { align: 'center', width: doc.page.width });
+      doc.fontSize(type.body).fillColor(colors.accent).font('Helvetica-Bold')
+         .text(formData.consultantEmail || 'info@yatrasutra.com', 0, yPos + 20, { align: 'center', width: doc.page.width });
+      
+      yPos += space.xl;
+      
+      // Divider
+      drawDivider(doc, cardX + 20, yPos, cardWidth - 40, colors.border);
+      
+      yPos += space.md;
+      
+      // Office address
+      doc.fontSize(type.tiny).fillColor(colors.text.light).font('Helvetica-Bold')
+         .text('OFFICE ADDRESS', 0, yPos, { align: 'center', width: doc.page.width });
       
       yPos += 14;
-      doc.fontSize(11).fillColor(darkText).font('Helvetica-Bold')
-         .text(formData.consultantMobile || '+91 97468 16609', 0, yPos, { align: 'center', width: doc.page.width });
-      
-      yPos += 18;
-      doc.fontSize(10).fillColor(grey).font('Helvetica')
-         .text('Email:', 0, yPos, { align: 'center', width: doc.page.width });
-      
-      yPos += 14;
-      doc.fontSize(11).fillColor(darkText).font('Helvetica-Bold')
-         .text(formData.consultantEmail || 'info@yatrasutra.com', 0, yPos, { align: 'center', width: doc.page.width });
-      
-      // Official Address Section
-      yPos += 25;
-      doc.moveTo(120, yPos).lineTo(doc.page.width - 120, yPos).strokeColor('#e0e0e0').lineWidth(1).stroke();
-      
-      yPos += 15;
-      doc.fontSize(10).fillColor(grey).font('Helvetica')
-         .text('Office Address:', 0, yPos, { align: 'center', width: doc.page.width });
-      
-      yPos += 14;
-      doc.fontSize(9).fillColor(darkText).font('Helvetica')
+      doc.fontSize(type.small).fillColor(colors.text.medium).font('Helvetica')
          .text('1st Floor, Penta Corner Building, Changampuzha Metro Station,', 0, yPos, { align: 'center', width: doc.page.width });
       
-      yPos += 12;
-      doc.fontSize(9).fillColor(darkText).font('Helvetica')
-         .text('Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 0, yPos, { align: 'center', width: doc.page.width });
+      yPos += 14;
+      doc.text('Edapally, Kochi (Ernakulam) – Kerala, 682024, India', 0, yPos, { align: 'center', width: doc.page.width });
 
-      yPos += 45;
+      yPos += space.xl;
 
-      doc.fontSize(14).fillColor(pink).font('Helvetica-Bold')
-         .text('Thank you for choosing Yatrasutra Holidays!', 50, yPos, { align: 'center', width: doc.page.width - 100 });
+      // Thank you message - clean banner
+      const thankYouY = yPos;
+      const bannerX = (doc.page.width - 400) / 2;
       
-      yPos += 25;
-      doc.fontSize(10).fillColor(grey).font('Helvetica')
-         .text('We look forward to creating unforgettable memories with you.', 50, yPos, { align: 'center', width: doc.page.width - 100 });
+      doc.rect(bannerX, thankYouY, 400, 60)
+         .fillColor(colors.accent)
+         .fill();
+      
+      doc.fontSize(type.h4).fillColor(colors.text.white).font('Helvetica-Bold')
+         .text('Thank You for Choosing Yatrasutra Holidays!', bannerX, thankYouY + 15, { 
+           align: 'center', 
+           width: 400 
+         });
+      
+      doc.fontSize(type.small).fillColor(colors.text.white).font('Helvetica')
+         .text("We're excited to create unforgettable memories with you.", bannerX, thankYouY + 38, { 
+           align: 'center', 
+           width: 400 
+         });
 
-      addStyledFooter(doc, 6 + days.length);
+      addFooter(doc, currentPageNum);
 
       doc.end();
 
